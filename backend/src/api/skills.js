@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { getDb } = require('../db/db');
 const { validateSkill } = require('../services/skills/skill_validator');
+const { executeSkill } = require('../services/skills/skill_executor');
 
 const router = express.Router();
 
@@ -193,6 +194,16 @@ router.patch('/:id/toggle', (req, res) => {
   const newStatus = skill.is_active ? 0 : 1;
   db.prepare("UPDATE skills SET is_active = ? WHERE id = ?").run(newStatus, req.params.id);
   res.json({ is_active: Boolean(newStatus) });
+});
+
+// POST /skills/:id/execute - manual trigger
+router.post('/:id/execute', async (req, res) => {
+  try {
+    const result = await executeSkill(req.params.id, 'manual');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /skills/:id/executions

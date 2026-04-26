@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest --forceExit",
+    "test": "jest --runInBand --forceExit",
     "seed": "node scripts/seed_demo.js"
   },
   "jest": {

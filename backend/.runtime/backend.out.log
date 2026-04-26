@@ -1,0 +1,7 @@
+
+> backend@1.0.0 start
+> node src/index.js
+
+◇ injected env (12) from .env // tip: ⌘ override existing { override: true }
+WeaveClaw backend running on port 3000
+[SCHEDULER] Cron scheduler started
