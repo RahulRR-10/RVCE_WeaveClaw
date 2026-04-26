@@ -1,4 +1,4 @@
-# WeaveClaw — Complete Copilot Implementation Plan
+# WeaveClaw — Complete Copilot Implementation Plan (Gemini Edition)
 > **Read this entire document before writing a single line of code.**
 > Build strictly in phase order. Each phase has a mandatory checkpoint. Do not proceed until the checkpoint passes.
 > Stack: OpenClaw (Gateway) + Express/Node.js (port 3000) + SQLite + Flutter (emulator)
@@ -12,7 +12,7 @@ Flutter Emulator (Android/iOS)
         ↕  HTTP REST  (port 3000)
 WeaveClaw Express Backend  ←→  SQLite DB (~/.openclaw/WeaveClaw.db)
         ↕  Gateway API  (port 18789)
-OpenClaw Gateway  ←→  Ollama (local LLM, Mistral)
+OpenClaw Gateway
         ↕
    SKILL.md   (registers WeaveClaw as an OpenClaw skill)
    HEARTBEAT.md  (pattern scanner — the "Heartbeat Daemon" from the spec)
@@ -20,6 +20,8 @@ OpenClaw Gateway  ←→  Ollama (local LLM, Mistral)
    node-cron  (scheduled skill triggers inside Express)
         ↕
    ngrok tunnel  (public webhook URL for GitHub)
+        ↕
+Google Gemini API  (cloud LLM — gemini-3.1-pro-preview)
 ```
 
 **Key insight:** The spec's "Heartbeat Daemon" is implemented using OpenClaw's built-in `heartbeat` system (configured in `openclaw.json`) + a `HEARTBEAT.md` checklist file. You do NOT build a separate daemon process. OpenClaw IS the daemon.
@@ -27,6 +29,7 @@ OpenClaw Gateway  ←→  Ollama (local LLM, Mistral)
 **OpenClaw Gateway API base:** `http://localhost:18789`
 **WeaveClaw backend base:** `http://localhost:3000`
 **Flutter talks to:** `http://10.0.2.2:3000` (Android emulator localhost alias)
+**Gemini API base:** `https://generativelanguage.googleapis.com/v1beta/models`
 
 ---
 
@@ -48,14 +51,6 @@ sudo apt-get install -y nodejs
 node --version   # must be v24.x.x
 npm --version
 
-# Ollama (local LLM runtime)
-# macOS/Linux
-curl -fsSL https://ollama.com/install.sh | sh
-# Windows: download from https://ollama.com/download
-
-# Pull the Mistral model (used for NLP intent extraction)
-ollama pull mistral
-
 # ngrok (public webhook tunnel)
 # macOS
 brew install ngrok
@@ -69,6 +64,9 @@ snap install ngrok
 flutter doctor   # resolve any issues shown
 ```
 
+> **No local LLM runtime needed.** WeaveClaw uses the Google Gemini cloud API.
+> Get a free API key at https://aistudio.google.com — paste it into `.env` in step 0.4.
+
 ### 0.2 Install and Configure OpenClaw
 
 ```bash
@@ -76,9 +74,10 @@ flutter doctor   # resolve any issues shown
 npm install -g openclaw@latest
 
 # Run the interactive onboarding wizard
-# When prompted for model provider: choose Ollama
-# When prompted for model: enter mistral
+# When prompted for model provider: choose "custom" or "OpenAI-compatible"
 # When prompted to install daemon: YES
+# WeaveClaw calls Gemini directly — OpenClaw is only used for
+# skill registration and the heartbeat trigger, not for inference.
 openclaw onboard --install-daemon
 
 # Verify the gateway is running
@@ -91,9 +90,6 @@ openclaw doctor
 
 ### 0.3 Project Skeleton
 
-<!-- FIX: skill_builder.js belongs in services/nlp/ (it is created there in Phase 3.5).
-     Removed from services/skills/. Added services/heartbeat/ (Phase 5.1) and
-     backend/scripts/ (Phase 8.1) which were missing from the original tree. -->
 ```
 WeaveClaw/
 ├── backend/                    ← Express + Node.js server
@@ -111,14 +107,14 @@ WeaveClaw/
 │   │   │   │   ├── rule_classifier.js
 │   │   │   │   ├── clarification_handler.js
 │   │   │   │   ├── skill_executor_handler.js
-│   │   │   │   ├── skill_builder.js          ← lives here, NOT in services/skills/
+│   │   │   │   ├── skill_builder.js
 │   │   │   │   └── intent_extraction.prompt.md
 │   │   │   ├── skills/
 │   │   │   │   ├── skill_validator.js
 │   │   │   │   ├── semantic_validator.js
 │   │   │   │   ├── conflict_detector.js
 │   │   │   │   └── skill_executor.js
-│   │   │   ├── heartbeat/                    ← added (Phase 5.1)
+│   │   │   ├── heartbeat/
 │   │   │   │   └── pattern_scanner.js
 │   │   │   └── integrations/
 │   │   │       ├── smartthings.js
@@ -129,7 +125,7 @@ WeaveClaw/
 │   │   │   ├── schema.sql
 │   │   │   └── db.js
 │   │   └── index.js
-│   ├── scripts/                              ← added (Phase 8.1 seed script)
+│   ├── scripts/
 │   │   └── seed_demo.js
 │   ├── tests/
 │   │   ├── skills.test.js
@@ -139,8 +135,8 @@ WeaveClaw/
 │   ├── .env.example
 │   └── package.json
 ├── openclaw-skill/             ← OpenClaw integration files
-│   ├── SKILL.md                ← Registers WeaveClaw with OpenClaw
-│   └── HEARTBEAT.md            ← Pattern scanner instructions
+│   ├── SKILL.md
+│   └── HEARTBEAT.md
 ├── flutter_app/                ← Flutter frontend
 │   ├── lib/
 │   │   ├── main.dart
@@ -165,7 +161,6 @@ WeaveClaw/
 └── README.md
 ```
 
-<!-- FIX: Added services/heartbeat and scripts to the mkdir command. -->
 Create the backend project:
 ```bash
 mkdir -p WeaveClaw/backend/src/{api,services/nlp,services/skills,services/integrations,services/heartbeat,db}
@@ -183,7 +178,6 @@ Create the Flutter project:
 cd WeaveClaw
 flutter create flutter_app
 cd flutter_app
-# Create the assets directory (not created by flutter create by default)
 mkdir -p assets
 # Add to pubspec.yaml dependencies:
 # http: ^1.2.0
@@ -198,8 +192,8 @@ PORT=3000
 DB_PATH=./WeaveClaw.db
 SIMULATION_MODE=true
 
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=mistral
+GEMINI_API_KEY=                 # get from https://aistudio.google.com
+GEMINI_MODEL=gemini-3.1-pro-preview
 
 OPENCLAW_GATEWAY_URL=http://localhost:18789
 OPENCLAW_AUTH_TOKEN=            # fill after openclaw onboard
@@ -207,14 +201,22 @@ OPENCLAW_AUTH_TOKEN=            # fill after openclaw onboard
 SMARTTHINGS_TOKEN=              # optional
 SAMSUNG_HEALTH_API_KEY=         # optional
 
-PUBLIC_WEBHOOK_BASE_URL=        # fill after ngrok setup in Phase 3
+PUBLIC_WEBHOOK_BASE_URL=        # fill after ngrok setup in Phase 2
 HEARTBEAT_INTERVAL_MINUTES=15
 SUGGESTION_CONFIDENCE_THRESHOLD=0.70
 ```
 
 ### 0.5 Checkpoint 0
 - [ ] `node --version` prints v24.x.x
-- [ ] `ollama run mistral "say hello"` returns a response
+- [ ] Gemini API key obtained from https://aistudio.google.com
+- [ ] Gemini smoke test passes:
+```bash
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=$GEMINI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"say hello"}]}]}' \
+  | jq .candidates[0].content.parts[0].text
+# Must return a greeting string
+```
 - [ ] `openclaw gateway status` shows running on port 18789
 - [ ] `flutter doctor` shows no critical issues
 - [ ] Android emulator boots and shows a Flutter app
@@ -305,7 +307,6 @@ function getDb() {
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
 
-    // Run schema
     const schema = fs.readFileSync(
       path.join(__dirname, 'schema.sql'), 'utf8'
     );
@@ -381,12 +382,12 @@ const router = express.Router();
 router.get('/', (req, res) => {
   const db = getDb();
   const skills = db.prepare(`
-    SELECT s.*, 
+    SELECT s.*,
       (SELECT COUNT(*) FROM execution_logs WHERE skill_id = s.id) as execution_count,
       (SELECT MAX(executed_at) FROM execution_logs WHERE skill_id = s.id) as last_executed
     FROM skills s ORDER BY s.created_at DESC
   `).all();
-  
+
   res.json(skills.map(s => ({
     ...s,
     conditions: JSON.parse(s.conditions),
@@ -427,10 +428,7 @@ router.post('/', (req, res) => {
   const db = getDb();
   const id = uuidv4();
 
-  // FIX: Previous version checked WHERE trigger_value = ? AND trigger_type = ? for all
-  // trigger types. For webhook skills trigger_value is always empty — any two webhook
-  // skills (even for different repos/events) would trip this check incorrectly.
-  // Fixed: webhook uniqueness is source + event; all other types use trigger_value.
+  // Webhook uniqueness is source + event; all other types use trigger_value.
   const existing = trigger.type === 'webhook'
     ? db.prepare(`
         SELECT id FROM skills
@@ -483,16 +481,11 @@ router.post('/', (req, res) => {
 });
 
 // PUT /skills/:id
-// BUG FIX: Previous version spread skill.actions (a JSON array) into an object — wrong shape for Zod.
-// Validation result was also never checked. UPDATE only wrote name/description, silently discarding
-// trigger/actions/conditions changes. Fixed: reconstruct full skill from existing DB row, merge with
-// req.body at the right level, validate, check the result, then UPDATE all mutable columns.
 router.put('/:id', (req, res) => {
   const db = getDb();
   const row = db.prepare('SELECT * FROM skills WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Skill not found' });
 
-  // Reconstruct the existing skill into the shape validateSkill expects
   const existing = {
     name: row.name,
     description: row.description,
@@ -506,11 +499,9 @@ router.put('/:id', (req, res) => {
     actions: JSON.parse(row.actions),
   };
 
-  // Merge with req.body — caller only needs to send the fields they want to change
   const merged = {
     ...existing,
     ...req.body,
-    // If caller sends a partial trigger object, deep-merge it instead of replacing
     trigger: req.body.trigger ? { ...existing.trigger, ...req.body.trigger } : existing.trigger,
   };
 
@@ -765,7 +756,6 @@ npm run dev
 curl http://localhost:3000/health
 # {"status":"ok","timestamp":"..."}
 
-# Create a skill manually:
 curl -X POST http://localhost:3000/skills \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Skill","trigger":{"type":"natural_language","value":"test","source":"user_input"},"actions":[{"service":"simulation","command":"turn_off","params":{}}]}'
@@ -786,7 +776,7 @@ const { v4: uuidv4 } = require('uuid');
 
 async function executeSimulated(skill, triggeredBy = 'manual') {
   const results = [];
-  
+
   for (let i = 0; i < skill.actions.length; i++) {
     const action = skill.actions[i];
     const msg = formatSimulationMessage(action);
@@ -794,7 +784,6 @@ async function executeSimulated(skill, triggeredBy = 'manual') {
     results.push({ action_index: i, status: 'simulated', response: msg });
   }
 
-  // Always write execution log
   const db = getDb();
   const logId = uuidv4();
   db.prepare(`
@@ -853,11 +842,6 @@ module.exports = { executeSmartThings };
 ### 2.3 Skill Executor (Core Engine)
 
 Create `backend/src/services/skills/skill_executor.js`:
-
-<!-- FIX: Removed dead import of executeSimulated from simulation.js. That function was
-     imported but never called — the executor has its own inline simulation logic with
-     its own formatMessage(). Keeping the dead import creates false confidence that
-     simulation.js is wired here when it is not. -->
 ```javascript
 const { getDb } = require('../../db/db');
 const { v4: uuidv4 } = require('uuid');
@@ -883,7 +867,6 @@ async function executeSkill(skillId, triggeredBy = 'manual') {
     try {
       let response;
       if (useSimulation || action.service === 'simulation') {
-        // Inline simulation — simulation.js is reserved for future direct-call integrations
         const msg = formatMessage(action);
         response = { simulated: true, message: msg };
         console.log(`[SIM] ${msg}`);
@@ -962,10 +945,9 @@ router.post('/:skill_id', async (req, res) => {
   // Acknowledge immediately (GitHub expects fast response)
   res.json({ received: true, skill_id: req.params.skill_id });
 
-  // Execute async
   const payload = req.body;
   console.log(`[WEBHOOK] Received for skill ${skill.name}:`, JSON.stringify(payload).slice(0, 200));
-  
+
   try {
     const result = await executeSkill(req.params.skill_id, 'webhook');
     console.log(`[WEBHOOK] Executed: ${JSON.stringify(result)}`);
@@ -1003,7 +985,6 @@ function startScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
 
-  // Check every minute for due scheduled skills
   cron.schedule('* * * * *', async () => {
     const db = getDb();
     const scheduledSkills = db.prepare(`
@@ -1014,7 +995,7 @@ function startScheduler() {
     const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
     for (const skill of scheduledSkills) {
-      const triggerTime = skill.trigger_value; // e.g. "07:00"
+      const triggerTime = skill.trigger_value;
       if (triggerTime === hhmm) {
         const extra = skill.trigger_extra ? JSON.parse(skill.trigger_extra) : {};
         if (checkDayOfWeek(extra.recurrence)) {
@@ -1097,7 +1078,6 @@ test('Execution log is written after execution', async () => {
 });
 
 test('POST /webhooks/:id fires skill', async () => {
-  // Create a webhook skill first
   const skillRes = await request(app).post('/skills').send({
     name: 'Webhook Test', trigger: { type: 'webhook', source: 'github', event: 'push' },
     actions: [{ service: 'simulation', command: 'turn_on', params: {} }]
@@ -1114,7 +1094,6 @@ test('POST /webhooks/:id fires skill', async () => {
 npm test
 # All tests pass
 
-# Manual test: trigger a skill and confirm log appears
 # ngrok must be running and URL in .env
 # Create a skill and paste webhook URL into GitHub repo settings → Webhooks
 # Push a commit → confirm execution log appears
@@ -1123,7 +1102,7 @@ npm test
 ---
 
 ## Phase 3 — NLP Intent Engine
-**Goal:** User types natural language → OpenClaw's LLM interprets it → skill is created or executed.
+**Goal:** User types natural language → Gemini interprets it → skill is created or executed.
 
 ### 3.1 Intent Extraction Prompt
 
@@ -1165,7 +1144,7 @@ User input: {USER_INPUT}
 Existing skill trigger values: {EXISTING_TRIGGERS}
 ```
 
-### 3.2 Intent Extractor (via OpenClaw Gateway / Ollama)
+### 3.2 Intent Extractor (via Google Gemini API)
 
 Create `backend/src/services/nlp/intent_extractor.js`:
 ```javascript
@@ -1177,34 +1156,61 @@ const PROMPT_TEMPLATE = fs.readFileSync(
 );
 
 const MAX_RETRIES = 3;
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 async function extractIntent(userInput, existingTriggers = []) {
   const prompt = PROMPT_TEMPLATE
     .replace('{USER_INPUT}', userInput)
     .replace('{EXISTING_TRIGGERS}', JSON.stringify(existingTriggers));
 
-  // Primary: Ollama with JSON retry loop
-  // BUG FIX: Previous version had no retry — a single parse failure returned null, which propagated
-  // to chat.js as an error. The rule classifier was never called as fallback when Ollama responded
-  // but returned malformed/prose-wrapped JSON. Fixed: retry up to MAX_RETRIES times, extracting
-  // JSON from anywhere in the response. Fall through to ruleClassify only after all retries exhausted.
+  const model = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview';
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    console.warn('[NLP] GEMINI_API_KEY not set — falling back to rule classifier');
+    return ruleClassify(userInput);
+  }
+
+  // Gemini call with JSON retry loop.
+  // Despite responseMimeType: 'application/json', Gemini occasionally wraps output in
+  // markdown fences. parseIntentJSON handles both cases.
+  // Fall through to ruleClassify only after all retries exhausted or a network error.
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(`${process.env.OLLAMA_BASE_URL}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: process.env.OLLAMA_MODEL || 'mistral',
-          prompt: attempt === 1 ? prompt : prompt + '\n\nIMPORTANT: Respond with ONLY the raw JSON object. No prose, no markdown, no code fences.',
-          stream: false,
-          options: { temperature: attempt === 1 ? 0.1 : 0.0 }
-        }),
-        signal: AbortSignal.timeout(15000)
-      });
+      const systemNote = attempt > 1
+        ? '\n\nCRITICAL: Your previous response could not be parsed as JSON. Respond with ONLY the raw JSON object. No prose, no markdown, no code fences.'
+        : '';
 
-      if (!response.ok) throw new Error(`Ollama HTTP error: ${response.status}`);
+      const response = await fetch(
+        `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt + systemNote }] }],
+            generationConfig: {
+              temperature: attempt === 1 ? 0.1 : 0.0,
+              responseMimeType: 'application/json',
+            },
+          }),
+          signal: AbortSignal.timeout(20000),
+        }
+      );
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`Gemini HTTP ${response.status}: ${errBody}`);
+      }
+
       const data = await response.json();
-      const text = data.response?.trim() || '';
+
+      // Gemini response shape: data.candidates[0].content.parts[0].text
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+      if (!text) {
+        console.warn(`[NLP] Attempt ${attempt}/${MAX_RETRIES}: empty Gemini response`);
+        continue;
+      }
 
       const parsed = parseIntentJSON(text);
       if (parsed) {
@@ -1212,29 +1218,28 @@ async function extractIntent(userInput, existingTriggers = []) {
         return parsed;
       }
 
-      console.warn(`[NLP] Attempt ${attempt}/${MAX_RETRIES}: could not extract valid JSON from LLM response`);
+      console.warn(`[NLP] Attempt ${attempt}/${MAX_RETRIES}: could not extract valid JSON from Gemini response`);
 
     } catch (err) {
       console.warn(`[NLP] Attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}`);
-      break; // Network/timeout error — no point retrying Ollama, break to rule classifier
+      break; // Network/auth error — no point retrying, fall to rule classifier
     }
   }
 
-  // All retries exhausted or Ollama unavailable — use rule-based fallback
-  console.warn('[NLP] Falling back to rule classifier');
+  console.warn('[NLP] All retries exhausted — falling back to rule classifier');
   return ruleClassify(userInput);
 }
 
 function parseIntentJSON(text) {
   // Strategy 1: Strip markdown code fences and try direct parse
+  // (Gemini sometimes adds these even with responseMimeType: 'application/json')
   const stripped = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
   try {
     const parsed = JSON.parse(stripped);
     if (isValidIntent(parsed)) return parsed;
   } catch { /* fall through */ }
 
-  // Strategy 2: LLMs often embed JSON inside prose ("Sure! Here's the intent: {...}").
-  // Extract first {...} block from raw text.
+  // Strategy 2: Extract first {...} block from prose
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
@@ -1251,12 +1256,12 @@ function isValidIntent(obj) {
     ['create_skill', 'execute_existing_skill', 'clarification_needed'].includes(obj.intent);
 }
 
-// Fallback: rule-based classifier
+// Fallback: rule-based classifier — used when Gemini is unavailable or all retries fail
 function ruleClassify(input) {
   const lower = input.toLowerCase();
 
   const timeMatch = lower.match(/(\d{1,2}(?::\d{2})?(?:am|pm)?)\s*(every|each)?\s*(weekday|daily|monday|tuesday|wednesday|thursday|friday|saturday|sunday)?/);
-  if (timeMatch || lower.includes('every') && lower.includes('at')) {
+  if (timeMatch || (lower.includes('every') && lower.includes('at'))) {
     return {
       intent: 'create_skill', trigger_type: 'time',
       entities: {}, actions: [], missing_entities: [],
@@ -1280,7 +1285,6 @@ function ruleClassify(input) {
     };
   }
 
-  // Default: NL create_skill
   return {
     intent: 'create_skill', trigger_type: 'natural_language', trigger_source: 'user_input',
     entities: { raw: input }, actions: [], missing_entities: [], clarification_needed: false
@@ -1309,7 +1313,6 @@ function getPartial(sessionId) {
     sessions.delete(sessionId);
     return null;
   }
-  // Reset TTL on valid response
   entry.expiresAt = Date.now() + TTL_MS;
   return entry.intent;
 }
@@ -1323,7 +1326,6 @@ function mergeEntity(partialIntent, entityKey, entityValue) {
   if (!merged.entities) merged.entities = {};
   merged.entities[entityKey] = entityValue;
 
-  // Remove from missing_entities
   if (merged.missing_entities) {
     merged.missing_entities = merged.missing_entities.filter(e => e !== entityKey);
   }
@@ -1398,7 +1400,6 @@ function buildSkillFromIntent(intent, sessionId) {
   const db = getDb();
   const devices = db.prepare('SELECT * FROM devices').all();
 
-  // Map intent action device references to actual device IDs
   const actions = (intent.actions || []).map(action => {
     const matchedDevice = findDevice(devices, action.device);
     return {
@@ -1409,7 +1410,6 @@ function buildSkillFromIntent(intent, sessionId) {
     };
   });
 
-  // Ensure at least one action
   if (!actions.length) {
     actions.push({ service: 'simulation', command: 'log', params: { message: 'Skill executed' } });
   }
@@ -1435,12 +1435,9 @@ function buildSkillFromIntent(intent, sessionId) {
   return skill;
 }
 
-// BUG FIX: Previous version used d.name.toLowerCase().includes(action.device?.toLowerCase() || '').
-// Two problems:
-//   1. includes('') always returns true — undefined/empty action.device matched the first device.
-//   2. Substring match is ambiguous — "lights" hits multiple devices; first-wins is arbitrary.
-// Fixed: priority-ordered matching — exact ID → exact name → type → slug token match.
-// Returns null (not first device) on no match.
+// Priority-ordered device matching: exact ID → exact name → type → slug token match.
+// Returns null (not first device) on no match — prevents undefined action.device
+// from silently matching the first device via includes('').
 function findDevice(devices, reference) {
   if (!reference || typeof reference !== 'string' || reference.trim() === '') return null;
 
@@ -1500,12 +1497,6 @@ module.exports = { buildSkillFromIntent };
 ### 3.6 Chat Endpoint (the main entry point)
 
 Create `backend/src/api/chat.js`:
-
-<!-- FIX: Removed duplicate require() calls from inside createSkillFromIntent() body.
-     buildSkillFromIntent and uuidv4 were already imported at the top of the file;
-     re-requiring inside the function is dead weight and was misleading.
-     FIX: conditions was hardcoded to JSON.stringify([]) — intent conditions were always
-     discarded. Fixed to JSON.stringify(skillData.conditions || []). -->
 ```javascript
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
@@ -1590,7 +1581,6 @@ async function createSkillFromIntent(intent, sessionId, db, res) {
     return res.json({ type: 'validation_error', errors: validation.errors });
   }
 
-  // Conflict detection
   const conflict = detectConflict(skillData, db);
   if (conflict.conflict_detected) {
     return res.json({ type: 'conflict_detected', conflict, session_id: sessionId });
@@ -1615,7 +1605,7 @@ async function createSkillFromIntent(intent, sessionId, db, res) {
     skillData.trigger.type, skillData.trigger.value || '',
     skillData.trigger.source || null,
     JSON.stringify({ event: skillData.trigger.event, recurrence: skillData.trigger.recurrence, repo: skillData.trigger.repo }),
-    JSON.stringify(skillData.conditions || []),   // FIX: was hardcoded JSON.stringify([])
+    JSON.stringify(skillData.conditions || []),
     JSON.stringify(skillData.actions),
     JSON.stringify(metadata)
   );
@@ -1650,7 +1640,10 @@ Create `backend/tests/nlp.test.js`:
 const request = require('supertest');
 process.env.DB_PATH = ':memory:';
 process.env.SIMULATION_MODE = 'true';
-process.env.OLLAMA_BASE_URL = 'http://localhost:11434';
+// Tests pass without a key — they exercise the rule classifier fallback.
+// Set GEMINI_API_KEY in your shell environment to test the full Gemini path.
+process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+process.env.GEMINI_MODEL = 'gemini-3.1-pro-preview';
 const app = require('../src/index');
 
 test('POST /chat creates a skill from natural language', async () => {
@@ -1682,7 +1675,7 @@ test('POST /chat handles clarification loop', async () => {
     session_id: 'test-session-3'
   });
   expect(res1.status).toBe(200);
-  
+
   if (res1.body.type === 'clarification_needed') {
     const res2 = await request(app).post('/chat').send({
       message: 'myuser/myrepo', session_id: 'test-session-3'
@@ -1696,7 +1689,7 @@ test('POST /chat handles clarification loop', async () => {
 ### ✅ Checkpoint 3
 ```bash
 npm test
-# NLP tests pass (may be slow due to Ollama — 15–20s per test)
+# NLP tests pass (rule classifier path: instant; Gemini path: ~5–10s per test)
 
 curl -X POST http://localhost:3000/chat \
   -H "Content-Type: application/json" \
@@ -1739,11 +1732,8 @@ function detectConflict(newSkill, db) {
         conflicting_skill_name: existing.name,
         conflict_type: 'contradictory_device_command',
         conflict_detail: contradiction,
-        // BUG FIX: Previous version returned a flat string list with no recommended option
-        // and included 'merge_into_one' for contradictory commands. Merging contradictory
-        // actions (AC at 22°C vs 24°C) fires both simultaneously — the exact problem we prevent.
-        // Fixed: structured objects with id/label/consequence/recommended, and merge_into_one
-        // excluded for contradictory_device_command conflicts.
+        // merge_into_one is excluded — merging contradictory actions (e.g. AC at 22°C vs 24°C)
+        // fires both simultaneously, which IS the contradiction we prevent.
         recommended_resolution: 'prioritise_new',
         resolution_options: [
           {
@@ -1758,8 +1748,6 @@ function detectConflict(newSkill, db) {
             consequence: `Discards the new skill. "${existing.name}" continues running unchanged.`,
             recommended: false,
           },
-          // merge_into_one intentionally excluded — merging contradictory actions produces a
-          // skill that fires both at once, which IS the contradiction we are preventing.
           {
             id: 'edit_new_before_saving',
             label: 'Edit before saving',
@@ -1846,20 +1834,17 @@ function semanticValidate(skillData, db) {
   }));
 
   for (const action of skillData.actions) {
-    // Device availability check
     if (action.device_id) {
       const device = devices.find(d => d.id === action.device_id || d.name === action.device_id);
       if (!device) {
         warnings.push(`Device "${action.device_id}" is not registered in your environment. Add the device or switch to simulation mode.`);
       } else {
-        // Action feasibility check
         if (!device.capabilities.includes(action.command)) {
           errors.push(`Device "${device.name}" does not support command "${action.command}". Supported: ${device.capabilities.join(', ')}`);
         }
       }
     }
 
-    // Service availability check
     if (action.service === 'smartthings' && !process.env.SMARTTHINGS_TOKEN) {
       warnings.push(`SmartThings is not configured (no token). This action will use simulation mode.`);
     }
@@ -1880,7 +1865,6 @@ const { getDb } = require('../db/db');
 
 const router = express.Router();
 
-// POST /conflicts/resolve
 router.post('/resolve', (req, res) => {
   const { new_skill, conflicting_skill_id, resolution, conflict_type } = req.body;
   const db = getDb();
@@ -1942,10 +1926,9 @@ app.use('/conflicts', conflictsRouter);
 
 ### 4.4 Wire Semantic Validator and Conflict Detector into POST /skills
 
-Now that Phase 4 is complete, update `backend/src/api/skills.js` to run the full validation pipeline on every direct skill write (including community hub imports). Add these imports at the top of `skills.js`:
+Now that Phase 4 is complete, update `backend/src/api/skills.js`. Add these imports at the top:
 
 ```javascript
-// Add at top of skills.js after existing imports:
 const { semanticValidate } = require('../services/skills/semantic_validator');
 const { detectConflict } = require('../services/skills/conflict_detector');
 ```
@@ -1953,8 +1936,7 @@ const { detectConflict } = require('../services/skills/conflict_detector');
 Then insert the following block inside `router.post('/')`, **after** the duplicate check and **before** the INSERT:
 
 ```javascript
-  // Semantic validation — non-blocking warnings for user skills,
-  // blocking for community imports unless user has acknowledged.
+  // Semantic validation — blocking for community imports unless acknowledged
   const semantic = semanticValidate({ actions }, db);
   if (semantic.errors.length > 0) {
     return res.status(400).json({ error: 'Semantic validation failed', errors: semantic.errors });
@@ -2010,7 +1992,6 @@ test('conflict_detected response has structured resolution options', async () =>
     expect(opt).toHaveProperty('label');
     expect(opt).toHaveProperty('consequence');
     expect(opt).toHaveProperty('recommended');
-    // merge_into_one must NOT appear for contradictory_device_command conflicts
     expect(conflict.resolution_options.some(o => o.id === 'merge_into_one')).toBe(false);
   }
 });
@@ -2173,11 +2154,6 @@ module.exports = { scanPatterns };
 ### 5.2 Suggestions API
 
 Create `backend/src/api/suggestions.js`:
-
-<!-- FIX: In the accept route, suggestedSkill is a parsed JS object (from JSON.parse of
-     suggestion.suggested_skill). Its .actions and .conditions fields are JS arrays.
-     better-sqlite3 cannot bind a JS array directly as a parameter — it throws a TypeError.
-     Fixed: JSON.stringify() all array/object fields before passing to .run(). -->
 ```javascript
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
@@ -2202,7 +2178,7 @@ router.post('/:id/accept', async (req, res) => {
   const suggestion = db.prepare('SELECT * FROM suggestions WHERE id = ?').get(req.params.id);
   if (!suggestion) return res.status(404).json({ error: 'Suggestion not found' });
 
-  // suggestedSkill is a parsed JS object — its .actions and .conditions are arrays.
+  // suggestedSkill is a parsed JS object — .actions and .conditions are JS arrays.
   // Must re-stringify before passing to better-sqlite3 or it throws TypeError.
   const suggestedSkill = JSON.parse(suggestion.suggested_skill || '{}');
   const skillId = uuidv4();
@@ -2226,12 +2202,11 @@ router.post('/:id/accept', async (req, res) => {
     suggestedSkill.trigger_type,
     suggestedSkill.trigger_value || '',
     suggestedSkill.trigger_source || null,
-    // trigger_extra is stored as a JSON string inside suggested_skill — normalize defensively
     typeof suggestedSkill.trigger_extra === 'string'
       ? suggestedSkill.trigger_extra
       : JSON.stringify(suggestedSkill.trigger_extra || {}),
-    JSON.stringify(suggestedSkill.conditions || []),   // FIX: was || '[]' on a JS array — crashed
-    JSON.stringify(suggestedSkill.actions || []),      // FIX: same bug
+    JSON.stringify(suggestedSkill.conditions || []),
+    JSON.stringify(suggestedSkill.actions || []),
     JSON.stringify(metadata)
   );
 
@@ -2264,7 +2239,7 @@ app.use('/suggestions', suggestionsRouter);
 ### 5.3 Wire Up OpenClaw Heartbeat
 
 #### openclaw.json configuration
-Add this to your `~/.openclaw/openclaw.json`:
+Add to `~/.openclaw/openclaw.json`:
 ```json
 {
   "agents": {
@@ -2361,7 +2336,7 @@ POST http://localhost:3000/suggestions/<id>/accept
 Always forward user intent to POST /chat first. Let WeaveClaw handle classification.
 ```
 
-Copy skill to OpenClaw:
+Copy skills to OpenClaw:
 ```bash
 mkdir -p ~/.openclaw/workspace/skills/WeaveClaw
 cp WeaveClaw/openclaw-skill/SKILL.md ~/.openclaw/workspace/skills/WeaveClaw/SKILL.md
@@ -2372,8 +2347,8 @@ cp WeaveClaw/openclaw-skill/HEARTBEAT.md ~/.openclaw/workspace/HEARTBEAT.md
 
 > **Note:** This curl-based seeding fires all executions at the current moment (stdDev ≈ 0,
 > day_frequency = 1). It proves the scan endpoint works but rarely crosses the confidence
-> threshold because there is no day-of-week spread. For the actual demo, use **Phase 8.1's
-> `npm run seed`** which distributes logs across past weekdays correctly.
+> threshold. For the actual demo, use **Phase 8.1's `npm run seed`** which distributes logs
+> across past weekdays correctly.
 
 ```bash
 SKILL_ID=$(curl -s -X POST http://localhost:3000/skills \
@@ -2390,7 +2365,6 @@ curl http://localhost:3000/suggestions
 
 ### ✅ Checkpoint 5
 ```bash
-# After seeding execution data:
 curl http://localhost:3000/suggestions
 # Should return at least one suggestion with confidence_score ≥ 0.70
 
@@ -2405,7 +2379,7 @@ curl http://localhost:3000/skills
 ---
 
 ## Phase 6 — Community Hub (Mock Marketplace)
-**Goal:** A realistic mock hub UI with 10 hardcoded skills. Import runs real local validation. No backend server needed.
+**Goal:** A realistic mock hub UI with 10 hardcoded skills. Import runs real local validation. No additional backend needed.
 
 ### 6.1 Mock Hub Skills Data
 
@@ -2578,7 +2552,7 @@ Create `flutter_app/assets/mock_hub_skills.json`:
 ]
 ```
 
-The import validation is done by calling `POST /skills` on the backend with `source: 'community_imported'`. The full pipeline (Zod + semantic validation + conflict detection) runs automatically. No additional backend code needed.
+The import validation is done by calling `POST /skills` with `source: 'community_imported'`. The full pipeline (Zod + semantic validation + conflict detection) runs automatically.
 
 ---
 
@@ -2587,7 +2561,7 @@ The import validation is done by calling `POST /skills` on the backend with `sou
 
 ### 7.0 Android Manifest — HTTP and Internet Permission (DO THIS FIRST)
 
-> **Why:** Android API 28+ blocks all cleartext HTTP traffic by default. `http://10.0.2.2:3000` is HTTP, not HTTPS. Without this fix, every API call from the emulator silently fails with a `SocketException`. This must be done before running the app.
+> **Why:** Android API 28+ blocks all cleartext HTTP traffic by default. `http://10.0.2.2:3000` is HTTP, not HTTPS. Without this fix, every API call from the emulator silently fails. This must be done before running the app.
 
 Open `flutter_app/android/app/src/main/AndroidManifest.xml` and make two edits:
 
@@ -2605,7 +2579,7 @@ Open `flutter_app/android/app/src/main/AndroidManifest.xml` and make two edits:
     android:usesCleartextTraffic="true">
 ```
 
-The full file should look like this after editing:
+The full file after editing:
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -2837,7 +2811,6 @@ class _MainShellState extends State<MainShell> {
 Create `flutter_app/lib/screens/chat_screen.dart`:
 ```dart
 import 'package:flutter/material.dart';
-import 'dart:math';
 import '../services/api_service.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -3244,10 +3217,6 @@ class _SuggestionCard extends StatelessWidget {
 ### 7.7 Community Hub Screen
 
 Create `flutter_app/lib/screens/community_hub_screen.dart`:
-
-<!-- FIX: _showImportWarning's "Import in Sim Mode" button now passes acknowledge_warnings: true
-     so the backend's semantic validator lets the import through in simulation mode.
-     Previously the button just showed a SnackBar without actually re-sending the request. -->
 ```dart
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -3347,9 +3316,8 @@ class _CommunityHubScreenState extends State<CommunityHubScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
-            // FIX: Re-send the request with acknowledge_warnings: true so the backend
-            // semantic validator allows the import through in simulation mode.
-            // Previously this just showed a SnackBar without actually completing the import.
+            // Re-send with acknowledge_warnings: true so the backend semantic validator
+            // allows the import through in simulation mode.
             onPressed: () async {
               Navigator.pop(ctx);
               try {
@@ -3628,7 +3596,7 @@ curl -X POST http://localhost:3000/webhooks/<skill_id> \
 6. Open Skills tab → new scheduled skill visible
 ```
 
-### 8.3 Error Handling Checklist
+### 8.3 Error Handling
 
 Add to Express `index.js` (after all routes):
 ```javascript
@@ -3670,7 +3638,7 @@ curl -X POST http://localhost:3000/heartbeat/scan
 - [ ] Flutter emulator shows smooth UI for all 4 screens
 - [ ] Suggestions appear after seeding and scanning
 - [ ] Hub import shows device mismatch warning correctly
-- [ ] "Import in Sim Mode" actually completes the import (not just shows a toast)
+- [ ] "Import in Sim Mode" actually completes the import
 - [ ] OpenClaw gateway is running (`openclaw gateway status`)
 - [ ] SKILL.md and HEARTBEAT.md are in `~/.openclaw/workspace/`
 - [ ] ngrok tunnel documented in demo runbook with curl fallback
@@ -3712,13 +3680,14 @@ curl -X POST http://localhost:3000/heartbeat/scan
 4. **Do not write execution logs anywhere except `better-sqlite3` sync.** No async logging — use synchronous `db.prepare().run()`.
 5. **Do not use `localhost` in Flutter.** Android emulator uses `10.0.2.2`, iOS simulator uses `127.0.0.1`.
 6. **Do not set up ngrok in Phase 8.** Do it in Phase 2. The webhook demo depends on it from Phase 3 onward.
-7. **Do not import Ollama responses without stripping markdown code fences.** Always run `.replace(/\`\`\`json?\n?/g, '').trim()` before `JSON.parse`. Also extract `{...}` from prose — LLMs sometimes wrap JSON in conversational text.
+7. **Do not assume Gemini always returns clean JSON despite `responseMimeType: 'application/json'`.** Gemini occasionally wraps JSON in markdown fences anyway. Always run the two-strategy `parseIntentJSON` (strip fences → extract `{...}` block) before `JSON.parse`. Retry up to `MAX_RETRIES` with `temperature: 0.0` before falling through to `ruleClassify`.
 8. **Do not let partial intents touch the database.** Clarification state is in-memory Map only, with 10-min TTL.
 9. **Do not skip the `AndroidManifest.xml` edits in Phase 7.0.** Android blocks all HTTP cleartext by default. The app will silently fail all API calls without `usesCleartextTraffic="true"` and the `INTERNET` permission.
 10. **Do not forget to create `flutter_app/assets/` before Phase 6.** `flutter create` does not make this directory. Phase 6 writes `mock_hub_skills.json` there — the Hub screen crashes without it.
 11. **Do not spread `skill.actions` into the Zod validation object in `PUT /skills`.** `skill.actions` is a JSON array — spreading it produces `{ '0': {...}, '1': {...} }`, not the shape Zod expects. Reconstruct the full skill from all DB columns (parsing each JSON field), merge with `req.body`, then validate.
-12. **Do not return `null` from `parseIntentJSON` when Ollama responds but JSON is malformed.** A `null` return propagates to `chat.js` as a hard error — the rule classifier never runs. Retry up to `MAX_RETRIES` with a tighter prompt, then call `ruleClassify()` as the explicit fallback.
+12. **Do not return `null` from `parseIntentJSON` when Gemini responds but JSON is malformed.** A `null` return propagates to `chat.js` as a hard error — the rule classifier never runs. Retry up to `MAX_RETRIES` with a tighter prompt, then call `ruleClassify()` as the explicit fallback.
 13. **Do not use `includes('')` for device matching in `skill_builder.js`.** An empty or undefined `action.device` makes `includes('')` return `true` for every device, silently matching the first one in the array. Use priority-ordered matching: exact ID → exact name → type → slug tokens. Return `null` explicitly on no match.
 14. **Do not offer `merge_into_one` as a resolution for `contradictory_device_command` conflicts.** Merging `turn_on` + `turn_off` (or two different temperatures on the same device) into a single skill fires both actions simultaneously — that IS the contradiction. Exclude it from `resolution_options` for this conflict type and return a 400 if a client sends it anyway.
-15. **Do not forget to create `backend/scripts/` before Phase 8.** The seed script `backend/scripts/seed_demo.js` is created in Phase 8.1. The directory does not exist after `npm init` — it is now included in the Phase 0.3 `mkdir` command, but if you created the project before this fix, run `mkdir -p backend/scripts` manually before `npm run seed`.
-16. **Do not use the Phase 5.4 curl loop for the demo.** That loop fires all executions at the current timestamp (stdDev ≈ 0, day_frequency = 1 day). The heartbeat scanner's confidence formula requires day-of-week spread across multiple weekdays — it will never cross 0.70 from a single-moment burst. Always use `npm run seed` (Phase 8.1) for the demo, which distributes logs correctly across past weekdays.
+15. **Do not forget to create `backend/scripts/` before Phase 8.** The seed script `backend/scripts/seed_demo.js` is created in Phase 8.1. Run `mkdir -p backend/scripts` manually before `npm run seed` if you created the project before this was added to the Phase 0.3 `mkdir` command.
+16. **Do not use the Phase 5.4 curl loop for the demo.** That loop fires all executions at the current timestamp (stdDev ≈ 0, day_frequency = 1 day). The heartbeat scanner's confidence formula requires day-of-week spread across multiple weekdays — it will never cross 0.70 from a single-moment burst. Always use `npm run seed` (Phase 8.1) for the demo.
+17. **Do not start without a valid `GEMINI_API_KEY` in `.env`.** Without the key, every chat request silently falls through to `ruleClassify`. The rule classifier works but produces coarse intents — Gemini is required for full NLP quality. Get the key at https://aistudio.google.com before Phase 3.
