@@ -53,6 +53,32 @@ CREATE TABLE IF NOT EXISTS devices (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS watchers (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL CHECK(type IN ('github_commits', 'file_change')),
+  config TEXT NOT NULL,            -- JSON: { repo, branch, poll_interval_seconds }
+  notify_via TEXT NOT NULL CHECK(notify_via IN ('push', 'in_app')),
+  is_active INTEGER DEFAULT 1,
+  last_checked_at TEXT,
+  last_commit_sha TEXT,            -- for github_commits: SHA of last seen commit
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT DEFAULT 'default',
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  metadata TEXT,                   -- JSON: extra payload (repo, branch, author, etc.)
+  channel TEXT NOT NULL CHECK(channel IN ('push', 'in_app')),
+  is_read INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_execution_logs_skill_id ON execution_logs(skill_id);
 CREATE INDEX IF NOT EXISTS idx_execution_logs_executed_at ON execution_logs(executed_at);
 CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
+CREATE INDEX IF NOT EXISTS idx_watchers_is_active ON watchers(is_active);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);

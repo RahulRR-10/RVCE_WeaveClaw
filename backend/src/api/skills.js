@@ -217,10 +217,24 @@ router.patch('/:id/toggle', (req, res) => {
 // POST /skills/:id/execute - manual trigger
 router.post('/:id/execute', async (req, res) => {
   try {
+    console.log(`[SKILLS] Executing skill ${req.params.id} (manual trigger)`);
     const result = await executeSkill(req.params.id, 'manual');
+    console.log(`[SKILLS] Execution result: ${result.status} — ${result.actions_result?.map(r => r.response?.message || r.status).join(', ')}`);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Emulator offline
+    if (err.reason === 'emulator_offline' || err.code === 'EMULATOR_OFFLINE') {
+      return res.status(503).json({
+        type: 'error',
+        reason: 'emulator_offline',
+        message: "I can't reach the emulator right now. Is it running?",
+      });
+    }
+    res.status(500).json({
+      type: 'error',
+      reason: 'internal_error',
+      message: 'Something went wrong while executing the skill.',
+    });
   }
 });
 

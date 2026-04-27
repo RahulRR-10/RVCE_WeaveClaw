@@ -22,9 +22,18 @@ async function extractIntent(userInput, existingTriggers = []) {
     return ruleClassify(userInput, existingTriggers);
   }
 
+  // Pre-screen: the rule classifier handles device_command and watcher
+  // intents reliably via pattern matching. Skip Gemini for these — the LLM
+  // doesn't know about these intent types and will misclassify them.
+  const ruleResult = ruleClassify(userInput, existingTriggers);
+  if (ruleResult && ['device_command', 'watcher', 'unparseable'].includes(ruleResult.intent)) {
+    console.log(`[NLP] Rule classifier matched intent: ${ruleResult.intent} — skipping Gemini`);
+    return ruleResult;
+  }
+
   if (!apiKey) {
     console.warn('[NLP] GEMINI_API_KEY not set; falling back to rule classifier');
-    return ruleClassify(userInput, existingTriggers);
+    return ruleResult || ruleClassify(userInput, existingTriggers);
   }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -101,7 +110,7 @@ function parseIntentJSON(text) {
 
 function isValidIntent(obj) {
   return obj && typeof obj === 'object' &&
-    ['create_skill', 'execute_existing_skill', 'clarification_needed'].includes(obj.intent);
+    ['create_skill', 'execute_existing_skill', 'clarification_needed', 'device_command', 'unparseable', 'watcher'].includes(obj.intent);
 }
 
 module.exports = { extractIntent, parseIntentJSON, isValidIntent };

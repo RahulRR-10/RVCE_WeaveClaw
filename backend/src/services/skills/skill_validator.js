@@ -2,11 +2,11 @@ const { z } = require('zod');
 
 const TriggerSchema = z.object({
   type: z.enum(['natural_language','time','webhook','api_event','device_event','health_event']),
-  value: z.string().optional(),
-  source: z.enum(['user_input','smartthings','samsung_health','github','schedule']).optional(),
-  event: z.string().optional(),
-  recurrence: z.string().optional(),  // RRULE string
-  repo: z.string().optional(),
+  value: z.string().nullish(),
+  source: z.enum(['user_input','smartthings','samsung_health','github','schedule']).nullish(),
+  event: z.string().nullish(),
+  recurrence: z.string().nullish(),  // RRULE string
+  repo: z.string().nullish(),
 });
 
 const ConditionSchema = z.object({
@@ -16,14 +16,14 @@ const ConditionSchema = z.object({
 
 const ActionSchema = z.object({
   service: z.enum(['smartthings','simulation','openclaw','slack','github','smtp','webhook']),
-  device_id: z.string().optional(),
+  device_id: z.string().nullish(),
   command: z.string(),
   params: z.record(z.string(), z.any()).optional().default({}),
 });
 
 const SkillCreateSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   trigger: TriggerSchema,
   conditions: z.array(ConditionSchema).optional().default([]),
   actions: z.array(ActionSchema).min(1, 'At least one action required'),

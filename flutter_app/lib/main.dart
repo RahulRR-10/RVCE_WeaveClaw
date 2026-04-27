@@ -4,8 +4,13 @@ import 'screens/chat_screen.dart';
 import 'screens/community_hub_screen.dart';
 import 'screens/skill_library_screen.dart';
 import 'screens/suggestions_screen.dart';
+import 'services/chat_storage.dart';
 
-void main() => runApp(const WeaveClawApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ChatStorage.init();
+  runApp(const WeaveClawApp());
+}
 
 class WeaveClawApp extends StatelessWidget {
   const WeaveClawApp({super.key});

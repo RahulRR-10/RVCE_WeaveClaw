@@ -62,6 +62,26 @@ class ApiService {
     return _decodeList(res);
   }
 
+  static Future<List<Map<String, dynamic>>> getNotifications({int limit = 50}) async {
+    final res = await http.get(Uri.parse('$baseUrl/watchers/notifications?limit=$limit'));
+    return _decodeList(res);
+  }
+
+  static Future<List<Map<String, dynamic>>> getWatchers() async {
+    final res = await http.get(Uri.parse('$baseUrl/watchers'));
+    return _decodeList(res);
+  }
+
+  static Future<Map<String, dynamic>> deleteWatcher(String id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/watchers/$id'));
+    return _decodeOkMap(res);
+  }
+
+  static Future<Map<String, dynamic>> markNotificationRead(String id) async {
+    final res = await http.patch(Uri.parse('$baseUrl/watchers/notifications/$id/read'));
+    return _decodeOkMap(res);
+  }
+
   static Future<Map<String, dynamic>> importHubSkill(
     Map<String, dynamic> skill,
   ) async {

@@ -31,11 +31,24 @@ function isEmulatorCommand(command) {
     'open_url', 'open_app', 'search', 'search_youtube', 'search_google',
     'type_text', 'tap', 'press_key', 'go_home', 'go_back', 'screenshot',
     'launch',
+    // Phase 1.5: rich Android intents
+    'set_alarm', 'set_timer', 'play_music', 'take_photo',
+    'make_call', 'send_text',
+    'volume_up', 'volume_down', 'toggle_mute',
+    'set_brightness', 'toggle_wifi', 'toggle_bluetooth', 'open_settings',
   ].includes(command);
 }
 
 async function executeEmulatorAction(action) {
   const { command, params } = action;
+
+  // ─── Emulator online check ──────────────────────────────────
+  const online = await adb.isEmulatorOnline();
+  if (!online) {
+    const err = new Error("I can't reach the emulator right now. Is it running?");
+    err.reason = 'emulator_offline';
+    throw err;
+  }
 
   try {
     let result;
@@ -47,12 +60,36 @@ async function executeEmulatorAction(action) {
 
       case 'open_app':
       case 'launch': {
-        const pkg = params?.package || adb.resolvePackage(params?.app || '');
-        if (!pkg) {
-          return { executed: false, error: `Unknown app: "${params?.app}". Provide a package name.` };
+        // ─── App resolution guard ───────────────────────────
+        if (params?.package) {
+          result = await adb.openApp(params.package);
+          break;
         }
-        result = await adb.openApp(pkg);
-        break;
+
+        const appName = params?.app || '';
+        const resolution = await adb.resolvePackageFromDevice(appName);
+
+        if (resolution.status === 'resolved') {
+          result = await adb.openApp(resolution.package);
+          break;
+        }
+
+        if (resolution.status === 'multiple') {
+          return {
+            executed: false,
+            clarification_needed: true,
+            question: `I found a few apps matching '${appName}': ${resolution.matches.join(', ')}. Which one did you want?`,
+            context: { command, app: appName, candidates: resolution.matches },
+          };
+        }
+
+        // status === 'not_found'
+        return {
+          executed: false,
+          clarification_needed: true,
+          question: `I couldn't find an app called '${appName}' on the emulator. Did you mean one of these?\n${resolution.installed.slice(0, 15).join(', ')}\n...or type the exact package name.`,
+          context: { command, app: appName },
+        };
       }
 
       case 'search_youtube':
@@ -64,7 +101,6 @@ async function executeEmulatorAction(action) {
         break;
 
       case 'search': {
-        // Generic search — route to YouTube or Google based on params
         const target = (params?.app || params?.engine || 'google').toLowerCase();
         const query = params?.query || params?.text || '';
         if (target.includes('youtube') || target.includes('yt')) {
@@ -99,6 +135,59 @@ async function executeEmulatorAction(action) {
         result = await adb.screenshot();
         break;
 
+      // ─── Rich Android intents ─────────────────────────────
+      case 'set_alarm':
+        result = await adb.setAlarm(params?.hour || 6, params?.minute || 0, params?.message || 'Alarm');
+        break;
+
+      case 'set_timer':
+        result = await adb.setTimer(params?.seconds || 60, params?.message || 'Timer');
+        break;
+
+      case 'play_music':
+        result = await adb.playMusic(params?.query || 'music', params?.app);
+        break;
+
+      case 'take_photo':
+        result = await adb.takePhoto();
+        break;
+
+      case 'make_call':
+        result = await adb.makeCall(params?.target || '');
+        break;
+
+      case 'send_text':
+        result = await adb.sendText(params?.to || '', params?.message || '');
+        break;
+
+      case 'volume_up':
+        result = await adb.volumeUp();
+        break;
+
+      case 'volume_down':
+        result = await adb.volumeDown();
+        break;
+
+      case 'toggle_mute':
+        result = await adb.toggleMute();
+        break;
+
+      case 'set_brightness':
+        result = await adb.setBrightness(params?.level || 50);
+        break;
+
+      case 'toggle_wifi':
+        result = await adb.toggleWifi(params?.enable !== false);
+        break;
+
+      case 'toggle_bluetooth':
+        result = await adb.toggleBluetooth(params?.enable !== false);
+        break;
+
+      case 'open_settings':
+        result = await adb.openSettings(params?.panel);
+        break;
+
       default:
         return { executed: false, error: `Unknown emulator command: ${command}` };
     }
@@ -109,6 +198,12 @@ async function executeEmulatorAction(action) {
 
   } catch (err) {
     console.error(`[EMULATOR] ${command} failed: ${err.message}`);
+    // Re-throw with structured info for the caller
+    if (err.reason === 'emulator_offline' || err.code === 'EMULATOR_OFFLINE') {
+      const offlineErr = new Error("I can't reach the emulator right now. Is it running?");
+      offlineErr.reason = 'emulator_offline';
+      throw offlineErr;
+    }
     throw err;
   }
 }
