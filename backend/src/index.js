@@ -6,6 +6,7 @@ const skillsRouter = require('./api/skills');
 const devicesRouter = require('./api/devices');
 const webhooksRouter = require('./api/webhooks');
 const chatRouter = require('./api/chat');
+const conflictsRouter = require('./api/conflicts');
 const { startScheduler } = require('./services/skills/scheduler');
 
 const app = express();
@@ -16,6 +17,7 @@ app.use('/skills', skillsRouter);
 app.use('/devices', devicesRouter);
 app.use('/webhooks', webhooksRouter);
 app.use('/chat', chatRouter);
+app.use('/conflicts', conflictsRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

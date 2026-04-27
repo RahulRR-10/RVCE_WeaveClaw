@@ -3,6 +3,8 @@ const crypto = require('crypto');
 const { getDb } = require('../db/db');
 const { validateSkill } = require('../services/skills/skill_validator');
 const { executeSkill } = require('../services/skills/skill_executor');
+const { semanticValidate } = require('../services/skills/semantic_validator');
+const { detectConflict } = require('../services/skills/conflict_detector');
 
 const router = express.Router();
 
@@ -42,10 +44,6 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /skills
-// NOTE: semantic_validator and conflict_detector imports are added here in Phase 4.
-// At Phase 1, only syntactic (Zod) validation and a basic duplicate check run.
-// After completing Phase 4, update this route to also call semanticValidate() and
-// detectConflict() — see Phase 4.4 for the exact insertion point.
 router.post('/', (req, res) => {
   const validation = validateSkill(req.body);
   if (!validation.valid) {
@@ -55,6 +53,26 @@ router.post('/', (req, res) => {
   const { name, description, trigger, conditions, actions } = validation.data;
   const db = getDb();
   const id = crypto.randomUUID();
+
+  const semantic = semanticValidate({ actions }, db);
+  if (semantic.errors.length > 0) {
+    return res.status(400).json({ error: 'Semantic validation failed', errors: semantic.errors });
+  }
+
+  if (semantic.warnings.length > 0 && req.body.source === 'community_imported') {
+    if (!req.body.acknowledge_warnings) {
+      return res.status(422).json({
+        error: 'device_mismatch',
+        warnings: semantic.warnings,
+        message: 'Some devices or services are not configured. Send the same request with acknowledge_warnings: true to import in simulation mode.',
+      });
+    }
+  }
+
+  const conflict = detectConflict({ name, trigger, actions }, db);
+  if (conflict.conflict_detected) {
+    return res.status(409).json({ type: 'conflict_detected', conflict });
+  }
 
   // FIX: Previous version checked WHERE trigger_value = ? AND trigger_type = ? for all
   // trigger types. For webhook skills trigger_value is always empty — any two webhook

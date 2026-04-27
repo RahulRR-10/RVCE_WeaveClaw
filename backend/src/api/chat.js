@@ -7,6 +7,7 @@ const { handleExecuteExisting } = require('../services/nlp/skill_executor_handle
 const { buildSkillFromIntent } = require('../services/nlp/skill_builder');
 const { validateSkill } = require('../services/skills/skill_validator');
 const { detectConflict } = require('../services/skills/conflict_detector');
+const { semanticValidate } = require('../services/skills/semantic_validator');
 
 const router = express.Router();
 
@@ -75,6 +76,11 @@ function createSkillFromIntent(intent, sessionId, db, res) {
   const validation = validateSkill(skillData);
   if (!validation.valid) {
     return res.json({ type: 'validation_error', errors: validation.errors });
+  }
+
+  const semantic = semanticValidate(validation.data, db);
+  if (semantic.errors.length > 0) {
+    return res.json({ type: 'validation_error', errors: semantic.errors });
   }
 
   const conflict = detectConflict(skillData, db);
