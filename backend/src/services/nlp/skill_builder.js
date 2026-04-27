@@ -5,9 +5,19 @@ function buildSkillFromIntent(intent) {
   const devices = db.prepare('SELECT * FROM devices').all();
 
   const actions = (intent.actions || []).map(action => {
+    // Emulator control actions — pass through directly, no device matching
+    if (action.type === 'emulator_control') {
+      return {
+        service: 'openclaw',
+        command: action.command || 'open_app',
+        params: action.params || {},
+      };
+    }
+
+    // Device control actions — match to DB devices
     const matchedDevice = findDevice(devices, action.device);
     return {
-      service: matchedDevice ? matchedDevice.service : 'simulation',
+      service: matchedDevice ? matchedDevice.service : 'openclaw',
       device_id: matchedDevice ? matchedDevice.id : (action.device || undefined),
       command: action.command || 'turn_off',
       params: buildParams(action),
@@ -16,7 +26,7 @@ function buildSkillFromIntent(intent) {
 
   if (!actions.length) {
     actions.push({
-      service: 'simulation',
+      service: 'openclaw',
       command: 'log',
       params: { message: 'Skill executed' },
     });

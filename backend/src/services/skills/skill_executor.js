@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { getDb } = require('../../db/db');
 const { executeSmartThings } = require('../integrations/smartthings');
+const { executeLocal } = require('../integrations/openclaw');
 
 async function executeSkill(skillId, triggeredBy = 'manual') {
   const db = getDb();
@@ -22,25 +23,33 @@ async function executeSkill(skillId, triggeredBy = 'manual') {
 
     try {
       let response;
-      if (useSimulation || action.service === 'simulation') {
+
+      if (useSimulation) {
+        // Pure simulation — just log, no real device control
         const msg = formatMessage(action);
         response = { simulated: true, message: msg };
         console.log(`[SIM] ${msg}`);
       } else if (action.service === 'smartthings') {
+        // SmartThings API — requires real hardware + token
         response = await executeSmartThings(action);
       } else {
-        response = { message: `Service ${action.service} not yet implemented` };
+        // Local execution (openclaw / simulation / any service) —
+        // updates device state in the DB, returns success
+        response = await executeLocal(action);
       }
 
       results.push({ action_index: i, status: 'success', response });
     } catch (err) {
+      console.error(`[EXECUTOR] Action ${i} failed: ${err.message}`);
       results.push({ action_index: i, status: 'failed', error: err.message });
     }
   }
 
   const allSuccess = results.every(r => r.status === 'success');
   const anySuccess = results.some(r => r.status === 'success');
-  const status = useSimulation ? 'simulated' : (allSuccess ? 'success' : anySuccess ? 'partial' : 'failed');
+  const status = useSimulation
+    ? 'simulated'
+    : (allSuccess ? 'success' : anySuccess ? 'partial' : 'failed');
 
   const logId = crypto.randomUUID();
   db.prepare(`

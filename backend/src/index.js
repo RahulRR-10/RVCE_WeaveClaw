@@ -38,6 +38,20 @@ app.post('/heartbeat/scan', (req, res) => {
   }
 });
 
+// Global error handler - avoid exposing stack traces in production.
+app.use((err, req, res, next) => {
+  console.error('[ERROR]', err);
+  res.status(500).json({
+    error: 'Something went wrong. Please try again.',
+    ...(process.env.NODE_ENV === 'development' && { detail: err.message }),
+  });
+});
+
+// Unknown route handler.
+app.use((req, res) => {
+  res.status(404).json({ error: `Endpoint ${req.method} ${req.path} not found` });
+});
+
 function startHeartbeatSchedule() {
   const heartbeatMins = parseInt(process.env.HEARTBEAT_INTERVAL_MINUTES || '15', 10);
   const interval = Number.isFinite(heartbeatMins) && heartbeatMins > 0 ? heartbeatMins : 15;

@@ -60,6 +60,21 @@ function ruleClassify(input, existingTriggers = []) {
     };
   }
 
+  // ─── Emulator / App control ──────────────────────────────────
+  const emulatorActions = parseEmulatorIntent(raw, lower);
+  if (emulatorActions) {
+    return {
+      intent: 'create_skill',
+      trigger_type: 'natural_language',
+      trigger_source: 'user_input',
+      trigger_value: raw,
+      entities: { raw },
+      actions: emulatorActions,
+      missing_entities: [],
+      clarification_needed: false,
+    };
+  }
+
   return {
     intent: 'create_skill',
     trigger_type: 'natural_language',
@@ -172,6 +187,67 @@ function normalize(value) {
 
 function tokenize(value) {
   return normalize(value).split(/\s+/).filter(Boolean);
+}
+
+// ─── Emulator / App intent detection ─────────────────────────
+const KNOWN_APPS = [
+  'youtube', 'chrome', 'browser', 'maps', 'gmail', 'settings', 'camera',
+  'photos', 'play store', 'clock', 'calculator', 'calendar', 'messages',
+  'phone', 'contacts', 'files', 'spotify', 'twitter', 'instagram', 'whatsapp',
+];
+
+function parseEmulatorIntent(raw, lower) {
+  // "open youtube and search for X" / "search youtube for X"
+  const ytSearch = lower.match(/(?:open\s+youtube\s+(?:and\s+)?search\s+(?:for\s+)?|search\s+(?:on\s+)?youtube\s+(?:for\s+)?)(.+)/);
+  if (ytSearch) {
+    return [{ type: 'emulator_control', command: 'search_youtube', params: { query: ytSearch[1].trim() } }];
+  }
+
+  // "search for X on youtube"
+  const ytSearch2 = lower.match(/search\s+(?:for\s+)?(.+?)\s+on\s+youtube/);
+  if (ytSearch2) {
+    return [{ type: 'emulator_control', command: 'search_youtube', params: { query: ytSearch2[1].trim() } }];
+  }
+
+  // "search google for X" / "google X"
+  const gSearch = lower.match(/(?:search\s+(?:on\s+)?google\s+(?:for\s+)?|google\s+)(.+)/);
+  if (gSearch) {
+    return [{ type: 'emulator_control', command: 'search_google', params: { query: gSearch[1].trim() } }];
+  }
+
+  // "search for X" (generic — defaults to google)
+  const genericSearch = lower.match(/search\s+(?:for\s+)?(.+)/);
+  if (genericSearch && !lower.includes('youtube')) {
+    return [{ type: 'emulator_control', command: 'search_google', params: { query: genericSearch[1].trim() } }];
+  }
+
+  // "go to https://..." / "open https://..."
+  const urlMatch = raw.match(/(?:go\s+to|open|visit|navigate\s+to)\s+(https?:\/\/\S+)/i);
+  if (urlMatch) {
+    return [{ type: 'emulator_control', command: 'open_url', params: { url: urlMatch[1] } }];
+  }
+
+  // "open <app>"
+  const appMatch = lower.match(/(?:open|launch|start|run)\s+(.+)/);
+  if (appMatch) {
+    const appName = appMatch[1].trim().replace(/\s+app$/i, '');
+    const isKnownApp = KNOWN_APPS.some(app => appName.includes(app));
+    if (isKnownApp) {
+      return [{ type: 'emulator_control', command: 'open_app', params: { app: appName } }];
+    }
+  }
+
+  // "go home" / "press home"
+  if (lower.includes('go home') || lower.includes('press home') || lower === 'home') {
+    return [{ type: 'emulator_control', command: 'go_home', params: {} }];
+  }
+
+  // "go back" / "press back"
+  if (lower.includes('go back') || lower.includes('press back') || lower === 'back') {
+    return [{ type: 'emulator_control', command: 'go_back', params: {} }];
+  }
+
+  return null;
 }
 
 module.exports = { ruleClassify, classifyRule, cosineSimilarity };

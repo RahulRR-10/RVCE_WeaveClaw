@@ -46,10 +46,11 @@ CREATE TABLE IF NOT EXISTS devices (
   name TEXT NOT NULL,
   type TEXT NOT NULL,          -- 'light','ac','switch','speaker','phone','coffee_machine'
   capabilities TEXT NOT NULL,  -- JSON array: ['turn_on','turn_off','set_temperature','set_color']
-  service TEXT NOT NULL CHECK(service IN ('smartthings','simulation','samsung_health')),
+  service TEXT NOT NULL CHECK(service IN ('smartthings','simulation','openclaw','samsung_health')),
   external_id TEXT,            -- SmartThings device ID
   is_online INTEGER DEFAULT 1,
-  registered_at TEXT DEFAULT (datetime('now'))
+  registered_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_execution_logs_skill_id ON execution_logs(skill_id);

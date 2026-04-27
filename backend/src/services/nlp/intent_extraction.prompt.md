@@ -7,6 +7,19 @@ RULES:
 - execute_existing_skill: user is issuing a command matching an existing skill trigger
 - clarification_needed: intent cannot be resolved without more info
 
+ACTION TYPES:
+- device_control: control a smart home device (turn_on, turn_off, set_temperature, set_color)
+- emulator_control: control the phone/emulator (open_url, open_app, search_youtube, search_google, search, type_text, go_home, go_back)
+
+For emulator_control actions, use these commands:
+- open_app: opens an app. Set "app" to the app name (youtube, chrome, settings, maps, gmail, camera, spotify, etc.)
+- open_url: opens a URL. Set "url" in the params.
+- search_youtube: searches YouTube. Set "query" in the params.
+- search_google: searches Google. Set "query" in the params.
+- search: generic search. Set "app" (youtube/google) and "query" in params.
+- go_home: press home button
+- go_back: press back button
+
 FEW-SHOT EXAMPLES:
 
 Input: "I'm going to sleep"
@@ -16,6 +29,22 @@ Output: {"intent":"execute_existing_skill","matched_trigger":"I'm going to sleep
 Input: "Turn off the lights please"
 Existing skills trigger values: []
 Output: {"intent":"create_skill","trigger_type":"natural_language","trigger_source":"user_input","entities":{"device_type":"lights","command":"turn_off"},"actions":[{"type":"device_control","device":"lights","command":"turn_off"}],"missing_entities":[],"clarification_needed":false}
+
+Input: "open youtube and search for lofi music"
+Existing skills trigger values: []
+Output: {"intent":"create_skill","trigger_type":"natural_language","trigger_source":"user_input","entities":{"app":"youtube","query":"lofi music"},"actions":[{"type":"emulator_control","command":"search_youtube","params":{"query":"lofi music"}}],"missing_entities":[],"clarification_needed":false}
+
+Input: "open chrome"
+Existing skills trigger values: []
+Output: {"intent":"create_skill","trigger_type":"natural_language","trigger_source":"user_input","entities":{"app":"chrome"},"actions":[{"type":"emulator_control","command":"open_app","params":{"app":"chrome"}}],"missing_entities":[],"clarification_needed":false}
+
+Input: "search google for weather today"
+Existing skills trigger values: []
+Output: {"intent":"create_skill","trigger_type":"natural_language","trigger_source":"user_input","entities":{"query":"weather today"},"actions":[{"type":"emulator_control","command":"search_google","params":{"query":"weather today"}}],"missing_entities":[],"clarification_needed":false}
+
+Input: "go to https://github.com"
+Existing skills trigger values: []
+Output: {"intent":"create_skill","trigger_type":"natural_language","trigger_source":"user_input","entities":{"url":"https://github.com"},"actions":[{"type":"emulator_control","command":"open_url","params":{"url":"https://github.com"}}],"missing_entities":[],"clarification_needed":false}
 
 Input: "Watch my GitHub repo and turn lights red on every push"
 Existing skills trigger values: []

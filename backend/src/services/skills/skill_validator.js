@@ -15,7 +15,7 @@ const ConditionSchema = z.object({
 });
 
 const ActionSchema = z.object({
-  service: z.enum(['smartthings','simulation','slack','github','smtp','webhook']),
+  service: z.enum(['smartthings','simulation','openclaw','slack','github','smtp','webhook']),
   device_id: z.string().optional(),
   command: z.string(),
   params: z.record(z.string(), z.any()).optional().default({}),
