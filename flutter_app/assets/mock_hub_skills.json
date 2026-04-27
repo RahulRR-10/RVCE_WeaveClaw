@@ -1,7 +1,298 @@
 [
   {
-    "id": "demo-1",
-    "name": "Good Night",
-    "description": "Turns off lights and sets AC for sleep"
+    "id": "hub-001",
+    "name": "Morning Routine Pro",
+    "description": "Turns on kitchen lights and starts coffee machine every weekday at 7am",
+    "tags": ["morning", "schedule", "home"],
+    "required_devices": ["kitchen-lights", "coffee-machine"],
+    "required_services": ["smartthings"],
+    "rating": 4.8,
+    "import_count": 1247,
+    "author_hash": "sha256:a3f8b2c1d4e5f6a7",
+    "published_at": "2026-01-15",
+    "trigger": {
+      "type": "time",
+      "value": "07:00",
+      "source": "schedule",
+      "extra": {
+        "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
+      }
+    },
+    "actions": [
+      {
+        "service": "smartthings",
+        "device_id": "kitchen-lights",
+        "command": "turn_on",
+        "params": {}
+      },
+      {
+        "service": "smartthings",
+        "device_id": "coffee-machine",
+        "command": "turn_on",
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "hub-002",
+    "name": "GitHub Deploy Alert",
+    "description": "Flash lights red and send Slack alert on every GitHub push",
+    "tags": ["github", "developer", "webhook"],
+    "required_devices": ["office-lights"],
+    "required_services": ["smartthings", "slack"],
+    "rating": 4.5,
+    "import_count": 892,
+    "author_hash": "sha256:b4c9d3e2f1a6b7c8",
+    "published_at": "2026-02-01",
+    "trigger": {
+      "type": "webhook",
+      "source": "github",
+      "event": "push"
+    },
+    "actions": [
+      {
+        "service": "smartthings",
+        "device_id": "office-lights",
+        "command": "set_color",
+        "params": {
+          "hex": "#FF0000"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-003",
+    "name": "Post-Workout Cool Down",
+    "description": "When Samsung Health detects workout end, cool the room and send hydration reminder",
+    "tags": ["health", "fitness", "samsung"],
+    "required_devices": ["bedroom-ac"],
+    "required_services": ["samsung_health", "smartthings"],
+    "rating": 4.3,
+    "import_count": 634,
+    "author_hash": "sha256:c5d0e4f3a2b8c9d0",
+    "published_at": "2026-01-28",
+    "trigger": {
+      "type": "health_event",
+      "source": "samsung_health",
+      "event": "workout_end"
+    },
+    "actions": [
+      {
+        "service": "smartthings",
+        "device_id": "bedroom-ac",
+        "command": "set_temperature",
+        "params": {
+          "value": 20,
+          "unit": "celsius"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-004",
+    "name": "Night Mode Lite",
+    "description": "Dims all lights and sets thermostat at 11pm",
+    "tags": ["night", "sleep", "schedule"],
+    "required_devices": ["living-room-lights", "bedroom-ac"],
+    "required_services": ["smartthings"],
+    "rating": 4.7,
+    "import_count": 2103,
+    "author_hash": "sha256:d6e1f5a4b3c9d0e1",
+    "published_at": "2026-01-10",
+    "trigger": {
+      "type": "time",
+      "value": "23:00",
+      "source": "schedule"
+    },
+    "actions": [
+      {
+        "service": "smartthings",
+        "device_id": "living-room-lights",
+        "command": "turn_off",
+        "params": {}
+      },
+      {
+        "service": "smartthings",
+        "device_id": "bedroom-ac",
+        "command": "set_temperature",
+        "params": {
+          "value": 24,
+          "unit": "celsius"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-005",
+    "name": "Focus Mode Scheduler",
+    "description": "Starts focus mode at 9am on weekdays, DND on, lights warm white",
+    "tags": ["focus", "work", "productivity"],
+    "required_devices": ["office-lights"],
+    "required_services": ["smartthings"],
+    "rating": 4.6,
+    "import_count": 1580,
+    "author_hash": "sha256:e7f2a6b5c4d0e1f2",
+    "published_at": "2026-02-05",
+    "trigger": {
+      "type": "time",
+      "value": "09:00",
+      "source": "schedule",
+      "extra": {
+        "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
+      }
+    },
+    "actions": [
+      {
+        "service": "simulation",
+        "device_id": "office-lights",
+        "command": "set_color",
+        "params": {
+          "hex": "#FFD700"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-006",
+    "name": "Weekend Lazy Mode",
+    "description": "On weekends at noon, dims lights and sets AC to comfort temp",
+    "tags": ["weekend", "relax", "home"],
+    "required_devices": ["living-room-lights", "living-room-ac"],
+    "required_services": ["smartthings"],
+    "rating": 4.1,
+    "import_count": 445,
+    "author_hash": "sha256:f8a3b7c6d5e1f2a3",
+    "published_at": "2026-02-14",
+    "trigger": {
+      "type": "time",
+      "value": "12:00",
+      "source": "schedule",
+      "extra": {
+        "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=SA,SU"
+      }
+    },
+    "actions": [
+      {
+        "service": "smartthings",
+        "device_id": "living-room-ac",
+        "command": "set_temperature",
+        "params": {
+          "value": 23,
+          "unit": "celsius"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-007",
+    "name": "CI/CD Build Monitor",
+    "description": "Green lights on successful build, red on failure via webhook",
+    "tags": ["devops", "github", "developer"],
+    "required_devices": ["office-lights"],
+    "required_services": ["smartthings"],
+    "rating": 4.4,
+    "import_count": 721,
+    "author_hash": "sha256:a9b4c8d7e6f2a4b5",
+    "published_at": "2026-03-01",
+    "trigger": {
+      "type": "webhook",
+      "source": "github",
+      "event": "workflow_run"
+    },
+    "actions": [
+      {
+        "service": "simulation",
+        "device_id": "office-lights",
+        "command": "set_color",
+        "params": {
+          "hex": "#00FF00"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-008",
+    "name": "Movie Night Mode",
+    "description": "Dim lights, set AC to comfortable temp when you say movie time",
+    "tags": ["entertainment", "home", "voice"],
+    "required_devices": ["living-room-lights", "living-room-ac"],
+    "required_services": ["smartthings"],
+    "rating": 4.9,
+    "import_count": 3241,
+    "author_hash": "sha256:b0c5d9e8f7a3b6c7",
+    "published_at": "2026-01-05",
+    "trigger": {
+      "type": "natural_language",
+      "value": "movie time",
+      "source": "user_input"
+    },
+    "actions": [
+      {
+        "service": "smartthings",
+        "device_id": "living-room-lights",
+        "command": "turn_off",
+        "params": {}
+      },
+      {
+        "service": "smartthings",
+        "device_id": "living-room-ac",
+        "command": "set_temperature",
+        "params": {
+          "value": 22,
+          "unit": "celsius"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-009",
+    "name": "Hydration Reminder",
+    "description": "Every 2 hours during work hours, sends a hydration notification",
+    "tags": ["health", "reminder", "productivity"],
+    "required_devices": [],
+    "required_services": [],
+    "rating": 4.2,
+    "import_count": 987,
+    "author_hash": "sha256:c1d6e0f9a8b4c7d8",
+    "published_at": "2026-02-20",
+    "trigger": {
+      "type": "time",
+      "value": "10:00",
+      "source": "schedule"
+    },
+    "actions": [
+      {
+        "service": "simulation",
+        "command": "notify",
+        "params": {
+          "message": "Time to drink water!"
+        }
+      }
+    ]
+  },
+  {
+    "id": "hub-010",
+    "name": "Bedtime Wind Down",
+    "description": "At 10pm, gradually dims lights and plays white noise. NL trigger: 'winding down'",
+    "tags": ["sleep", "night", "relax"],
+    "required_devices": ["bedroom-lights", "smart-speaker"],
+    "required_services": ["smartthings"],
+    "rating": 4.6,
+    "import_count": 1893,
+    "author_hash": "sha256:d2e7f1a0b9c5d8e9",
+    "published_at": "2026-01-22",
+    "trigger": {
+      "type": "natural_language",
+      "value": "winding down",
+      "source": "user_input"
+    },
+    "actions": [
+      {
+        "service": "smartthings",
+        "device_id": "bedroom-lights",
+        "command": "turn_off",
+        "params": {}
+      }
+    ]
   }
 ]
