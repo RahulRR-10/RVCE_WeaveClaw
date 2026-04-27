@@ -212,9 +212,25 @@ function tokenize(value) {
 
 function parseEmulatorIntent(raw, lower) {
   // ─── Try compound commands first ────────────────────────────
-  // Split on " and ", " then ", " also ", " plus "
-  // but only if both halves look like device commands
-  const compoundSplit = lower.split(/\s+(?:and\s+(?:then\s+)?|then\s+|also\s+|plus\s+)/);
+  // Normalize: collapse newlines, strip leading numbers/bullets
+  const normalized = lower.replace(/\r?\n/g, ', ').replace(/\s+/g, ' ').trim();
+
+  // Strategy 1: Numbered list  "1, X  2, Y  3, Z" or "1. X  2. Y"
+  const numberedParts = normalized.split(/(?:^|,\s*|\s+)\d+[.)\-,]\s*/).filter(Boolean);
+  if (numberedParts.length > 1) {
+    const allActions = [];
+    for (let part of numberedParts) {
+      // Strip trailing conjunctions: "and put..." → "put..."
+      part = part.replace(/^(?:and\s+|then\s+|also\s+)/, '').trim();
+      if (!part) continue;
+      const subActions = parseSingleEmulatorCommand(raw, part);
+      if (subActions) allActions.push(...subActions);
+    }
+    if (allActions.length > 0) return allActions;
+  }
+
+  // Strategy 2: Conjunction split  "X and Y then Z"
+  const compoundSplit = normalized.split(/\s+(?:and\s+(?:then\s+)?|then\s+|also\s+|plus\s+)/);
   if (compoundSplit.length > 1) {
     const allActions = [];
     for (const part of compoundSplit) {
@@ -279,6 +295,11 @@ function parseSingleEmulatorCommand(raw, lower) {
       return [{ type: 'emulator_control', command: 'screenshot', params: {} }];
     }
     return [{ type: 'emulator_control', command: 'take_photo', params: {} }];
+  }
+
+  // ─── Do Not Disturb (must be BEFORE call) ──────────────────
+  if (/(?:dnd|do\s+not\s+disturb|silent\s+mode|put.*(?:phone|device).*(?:dnd|silent|quiet))/.test(lower)) {
+    return [{ type: 'emulator_control', command: 'toggle_dnd', params: { enable: true } }];
   }
 
   // ─── Call someone ───────────────────────────────────────────

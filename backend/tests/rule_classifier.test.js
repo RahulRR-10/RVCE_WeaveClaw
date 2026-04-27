@@ -184,4 +184,20 @@ describe('Rule Classifier — Compound Commands', () => {
     expect(result.actions[1].command).toBe('set_brightness');
     expect(result.actions[1].params.level).toBe(80);
   });
+
+  test('splits numbered list "1, timer 2, play music 3, dnd" into 3 actions', () => {
+    const result = ruleClassify('1, set a timer for 30 minutes\n2, play relaxing music\n3, and put the phone on dnd');
+    expect(result.intent).toBe('device_command');
+    expect(result.actions.length).toBe(3);
+    expect(result.actions[0].command).toBe('set_timer');
+    expect(result.actions[0].params.seconds).toBe(1800);
+    expect(result.actions[1].command).toBe('play_music');
+    expect(result.actions[2].command).toBe('toggle_dnd');
+  });
+
+  test('classifies "put the phone on dnd" as toggle_dnd (not make_call)', () => {
+    const result = ruleClassify('put the phone on dnd');
+    expect(result.intent).toBe('device_command');
+    expect(result.actions[0].command).toBe('toggle_dnd');
+  });
 });

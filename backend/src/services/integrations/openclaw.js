@@ -33,7 +33,7 @@ function isEmulatorCommand(command) {
     'launch',
     // Phase 1.5: rich Android intents
     'set_alarm', 'set_timer', 'play_music', 'take_photo',
-    'make_call', 'send_text',
+    'make_call', 'send_text', 'toggle_dnd',
     'volume_up', 'volume_down', 'toggle_mute',
     'set_brightness', 'toggle_wifi', 'toggle_bluetooth', 'open_settings',
   ].includes(command);
@@ -158,6 +158,10 @@ async function executeEmulatorAction(action) {
 
       case 'send_text':
         result = await adb.sendText(params?.to || '', params?.message || '');
+        break;
+
+      case 'toggle_dnd':
+        result = await adb.toggleDnd(params?.enable !== false);
         break;
 
       case 'volume_up':

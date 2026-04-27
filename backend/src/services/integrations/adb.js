@@ -301,6 +301,16 @@ async function sendText(to, message) {
 }
 
 /**
+ * Toggle Do Not Disturb mode.
+ * 0 = off, 1 = priority only, 2 = total silence, 3 = alarms only
+ */
+async function toggleDnd(enable) {
+  const value = enable ? 2 : 0; // 2 = total silence, 0 = off
+  const result = await adbShell(`settings put global zen_mode ${value}`);
+  return { action: 'toggle_dnd', enable, result };
+}
+
+/**
  * Volume controls via media key events.
  */
 async function volumeUp() {
@@ -419,6 +429,7 @@ module.exports = {
   takePhoto,
   makeCall,
   sendText,
+  toggleDnd,
   volumeUp,
   volumeDown,
   toggleMute,
