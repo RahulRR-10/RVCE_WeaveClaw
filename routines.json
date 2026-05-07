@@ -1,0 +1,120 @@
+{
+  "routines": {
+    "gym-mode": {
+      "keywords": ["gym", "workout", "gym mode"],
+      "match_type": "any",
+      "description": "Prepares phone for gym session",
+      "variables": [],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "control", "action": "brightness", "value": 50},
+        {"type": "control", "action": "vol-down", "repeat": 3},
+        {"type": "control", "action": "open-app", "value": "com.google.android.apps.fitness"},
+        {"type": "delay", "value": 2},
+        {"type": "agent", "action": "Say 'Gym mode activated.'"}
+      ]
+    },
+    "morning-routine": {
+      "keywords": ["morning", "good morning", "wake up"],
+      "match_type": "any",
+      "description": "Full morning setup routine",
+      "variables": [],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "control", "action": "brightness", "value": 200},
+        {"type": "delay", "value": 1},
+        {"type": "control", "action": "open-url", "value": "https://www.google.com/search?q=weather+today"},
+        {"type": "delay", "value": 3},
+        {"type": "control", "action": "open-app", "value": "com.google.android.calendar"},
+        {"type": "delay", "value": 2},
+        {"type": "agent", "action": "Say 'Morning routine complete.'"}
+      ]
+    },
+    "night-mode": {
+      "keywords": ["night", "goodnight", "sleep mode", "night mode"],
+      "match_type": "any",
+      "description": "Prepares phone for sleep",
+      "variables": [],
+      "commands": [
+        {"type": "control", "action": "mute"},
+        {"type": "control", "action": "brightness", "value": 0},
+        {"type": "delay", "value": 1},
+        {"type": "control", "action": "home"},
+        {"type": "delay", "value": 1},
+        {"type": "control", "action": "sleep"}
+      ]
+    },
+    "drive-mode": {
+      "keywords": ["driving", "drive mode"],
+      "match_type": "any",
+      "description": "Sets up phone for driving",
+      "variables": [],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "control", "action": "brightness", "value": 255},
+        {"type": "delay", "value": 1},
+        {"type": "control", "action": "open-url", "value": "https://www.google.com/maps/dir/"}
+      ]
+    },
+    "open-weather": {
+      "keywords": ["weather"],
+      "match_type": "any",
+      "description": "Opens weather search",
+      "variables": [],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "control", "action": "open-url", "value": "https://www.google.com/search?q=weather"}
+      ]
+    },
+    "search-youtube": {
+      "keywords": ["search youtube for", "youtube "],
+      "match_type": "any",
+      "description": "Searches YouTube for a query",
+      "variables": ["QUERY"],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "control", "action": "open-url", "value": "https://www.youtube.com/results?search_query={QUERY}"}
+      ]
+    },
+    "search-google": {
+      "keywords": ["search for", "google ", "g "],
+      "match_type": "any",
+      "description": "Searches Google for a query",
+      "variables": ["QUERY"],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "control", "action": "open-url", "value": "https://www.google.com/search?q={QUERY}"}
+      ]
+    },
+    "open-app": {
+      "keywords": ["open ", "launch "],
+      "match_type": "prefix",
+      "description": "Opens a named app via deep link or agent",
+      "variables": ["APP_NAME"],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "agent", "action": "Open the {APP_NAME} app"}
+      ]
+    },
+    "set-reminder": {
+      "keywords": ["remind me", "set a reminder", "set reminder"],
+      "match_type": "any",
+      "description": "Sets a reminder via the agent",
+      "variables": ["TASK", "TIME"],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "agent", "action": "Set a reminder: {TASK} at {TIME}. Confirm when done."}
+      ]
+    },
+    "play-music": {
+      "keywords": ["play ", "play music"],
+      "match_type": "any",
+      "description": "Plays music via the agent",
+      "variables": ["QUERY"],
+      "commands": [
+        {"type": "control", "action": "wake"},
+        {"type": "agent", "action": "Search and play {QUERY} on YouTube Music or Spotify"}
+      ]
+    }
+  }
+}

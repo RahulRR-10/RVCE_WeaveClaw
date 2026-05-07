@@ -1,0 +1,233 @@
+cat > ~/phone_agent.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+# ─────────────────────────────────────────
+# Standard OpenAI-Compatible API Configuration
+# (Works with Ollama, LM Studio, Together AI, vLLM, etc.)
+API_ENDPOINT="http://localhost:11434/v1" # E.g., Use "https://api.together.xyz/v1" for cloud
+API_KEY="sk-your-api-key"                # Leave as whatever for local Ollama
+MODEL="qwen2.5-coder:32b"                # Adjust to your exact model name
+# ─────────────────────────────────────────
+
+MAX_STEPS=15
+SCREENSHOT_PATH="/sdcard/agent_screen.png"
+PAYLOAD_FILE="/sdcard/agent_payload.json"
+RESPONSE_FILE="/sdcard/agent_response.json"
+
+RISH_PATH="$HOME/bin/rish"
+
+if [ -f "$RISH_PATH" ] && "$RISH_PATH" -c 'echo ok' 2>/dev/null | grep -q ok; then
+  PRIV="shizuku"
+  PRIV_CMD="$RISH_PATH -c"
+elif su -c 'echo ok' 2>/dev/null | grep -q ok; then
+  PRIV="root"
+  PRIV_CMD="su -c"
+else
+  PRIV="none"
+  echo "⚠️ No root/Shizuku. Agent requires screen control privileges."
+  exit 1
+fi
+
+rcmd() {
+  $PRIV_CMD "$@"
+}
+
+SCREEN_SIZE=$(rcmd "wm size" 2>/dev/null | grep -o '[0-9]*x[0-9]*' | tail -1)
+SCREEN_W=$(echo "$SCREEN_SIZE" | cut -dx -f1)
+SCREEN_H=$(echo "$SCREEN_SIZE" | cut -dx -f2)
+[ -z "$SCREEN_W" ] && SCREEN_W=1080
+[ -z "$SCREEN_H" ] && SCREEN_H=2400
+CENTER_X=$((SCREEN_W / 2))
+echo "📱 Screen: ${SCREEN_W}x${SCREEN_H} (via $PRIV)"
+
+do_action() {
+  local ATYPE="$1"
+  case "$ATYPE" in
+    tap)         rcmd "input tap $2 $3" 2>/dev/null;  echo "  👆 Tap ($2, $3)" ;;
+    swipe)       rcmd "input swipe $2 $3 $4 $5 ${6:-800}" 2>/dev/null; echo "  👆 Swipe" ;;
+    type)        local ESCAPED=$(echo "$2" | sed 's/ /%s/g')
+                 rcmd "input text '$ESCAPED'" 2>/dev/null; echo "  ⌨️ Type: $2" ;;
+    key)         rcmd "input keyevent $2" 2>/dev/null; echo "  🔘 Key: $2" ;;
+    open_app)    rcmd "monkey -p $2 -c android.intent.category.LAUNCHER 1" 2>/dev/null
+                 echo "  📱 Open: $2"; sleep 2 ;;
+    scroll_down) rcmd "input swipe $CENTER_X $((SCREEN_H*7/10)) $CENTER_X $((SCREEN_H*3/10)) 300" 2>/dev/null
+                 echo "  ⬇️ Scroll down" ;;
+    scroll_up)   rcmd "input swipe $CENTER_X $((SCREEN_H*3/10)) $CENTER_X $((SCREEN_H*7/10)) 300" 2>/dev/null
+                 echo "  ⬆️ Scroll up" ;;
+    go_home)     rcmd "input keyevent 3" 2>/dev/null; echo "  🏠 Home" ;;
+    go_back)     rcmd "input keyevent 4" 2>/dev/null; echo "  ◀️ Back" ;;
+    wait)        echo "  ⏳ Wait ${2:-1}s"; sleep "${2:-1}" ;;
+    done)        echo "  ✅ $2" ;;
+  esac
+}
+
+if [ -z "$1" ]; then
+  echo "🤖 Phone Agent (Qwen Coder Edition)"
+  echo 'Usage: bash phone_agent.sh "<task>"'
+  exit 0
+fi
+
+if ! command -v jq &>/dev/null; then
+  echo "❌ jq not found. Run: pkg install jq -y"
+  exit 1
+fi
+
+TASK="$*"
+FULL_URL="${API_ENDPOINT}/chat/completions"
+
+echo ""
+echo "🤖 PHONE AGENT (Qwen 30B Coder)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📋 Task:     $TASK"
+echo "🧠 Model:    $MODEL"
+echo "🌐 Endpoint: $(echo "$FULL_URL" | cut -c1-60)..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+HISTORY=""
+
+# Note: Removed "You see a screenshot" since Qwen Coder relies purely on the UI text dump.
+SYSTEM="You are an Android phone agent (${SCREEN_W}x${SCREEN_H}). You receive a list of UI elements with their exact bounding box coordinates. Use the UI element coordinates for precision. ACTIONS (JSON only): {\"thought\": \"what I see and plan\", \"actions\": [{\"action\": \"tap\", \"x\": ${CENTER_X}, \"y\": 500}]} Action types: tap(x,y), swipe(x1,y1,x2,y2), type(text), key(code: 3=HOME 4=BACK 66=ENTER), open_app(package), scroll_down, scroll_up, go_home, go_back, wait(seconds), done(message). Packages: com.whatsapp, com.google.android.youtube, com.instagram.android, com.android.chrome, com.android.settings. IMPORTANT RULES: 1. JSON only, 1-2 actions per step. 2. PREFER using UI element coordinates over guessing. 3. If a tap did not work, try DIFFERENT coordinates or a different approach. 4. When you need to type, first make sure a text input field is focused. 5. Use open_app to launch apps, then wait 2-3s. 6. Use done when the task is complete. 7. ALWAYS use go_home or go_back actions to navigate."
+
+for STEP in $(seq 1 $MAX_STEPS); do
+  echo ""
+  echo "── STEP $STEP/$MAX_STEPS ──"
+
+  # We still take a screenshot for debugging/logging, but we don't send it to Qwen Coder
+  echo "  📸 Capturing state..."
+  rcmd "screencap -p $SCREENSHOT_PATH" 2>/dev/null
+  sleep 0.2
+
+  echo "  🔍 Reading UI..."
+  rcmd "uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1
+  sleep 0.1
+  UI_ELEMENTS=$(rcmd "cat /sdcard/ui.xml" 2>/dev/null \
+    | grep -oE '(text|content-desc)="[^"]*"[^>]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+    | head -100 \
+    | while read -r line; do
+        txt=$(echo "$line" | sed -n 's/.*text="\([^"]*\)".*/\1/p')
+        [ -z "$txt" ] && txt=$(echo "$line" | sed -n 's/.*content-desc="\([^"]*\)".*/\1/p')
+        bnds=$(echo "$line" | sed -n 's/.*bounds="\([^"]*\)".*/\1/p')
+        x1=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $1}' | cut -d, -f1)
+        y1=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $1}' | cut -d, -f2)
+        x2=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $2}' | cut -d, -f1)
+        y2=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $2}' | cut -d, -f2)
+        if [ -n "$x1" ] && [ -n "$y1" ] && [ -n "$x2" ] && [ -n "$y2" ]; then
+            cx=$(( (x1 + x2) / 2 )); cy=$(( (y1 + y2) / 2 ))
+            [ -n "$txt" ] && echo "${txt:0:30} center($cx,$cy)"
+        fi
+      done 2>/dev/null | tr '\n' ' ')
+  
+  UI_COUNT=$(echo "$UI_ELEMENTS" | grep -c "center" 2>/dev/null)
+  echo "  📋 $UI_COUNT elements parsed"
+
+  ESCAPED_SYSTEM=$(echo "$SYSTEM"    | sed 's/\\/\\\\/g; s/"/\\"/g')
+  ESCAPED_TASK=$(echo "$TASK"        | sed 's/\\/\\\\/g; s/"/\\"/g')
+  ESCAPED_UI=$(echo "$UI_ELEMENTS"   | tr '\n' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g')
+  ESCAPED_HIST=$(echo "$HISTORY"     | sed 's/\\/\\\\/g; s/"/\\"/g')
+
+  USER_TEXT="TASK: ${ESCAPED_TASK}. Step ${STEP}/${MAX_STEPS}. ${ESCAPED_HIST}UI Elements Currently On Screen: ${ESCAPED_UI}. Analyze the UI elements and output JSON ONLY."
+
+  rm -f "$PAYLOAD_FILE" 2>/dev/null
+  # Note: Image block removed entirely for text-only Qwen model
+  cat > "$PAYLOAD_FILE" << ENDJSON
+{
+  "model": "${MODEL}",
+  "max_tokens": 512,
+  "temperature": 0.1,
+  "response_format": {"type": "json_object"},
+  "messages": [
+    {
+      "role": "system",
+      "content": "${ESCAPED_SYSTEM}"
+    },
+    {
+      "role": "user",
+      "content": "${USER_TEXT}"
+    }
+  ]
+}
+ENDJSON
+
+  HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_FILE" \
+      -X POST "$FULL_URL" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${API_KEY}" \
+      -d "@${PAYLOAD_FILE}" \
+      --connect-timeout 15 --max-time 120 2>/dev/null)
+
+  if [ "$HTTP_CODE" != "200" ]; then
+      echo "  ❌ API error: HTTP $HTTP_CODE"
+      if [ -f "$RESPONSE_FILE" ]; then
+          ERROR_MSG=$(jq -r '.error.message // empty' "$RESPONSE_FILE" 2>/dev/null)
+          [ -n "$ERROR_MSG" ] && echo "  ❌ API says: $ERROR_MSG" || (echo "  ❌ Raw:"; head -5 "$RESPONSE_FILE")
+      fi
+      [ "$HTTP_CODE" = "429" ] && echo "  ⏳ Rate limited, waiting 10s..." && sleep 10
+      continue
+  fi
+
+  CLEAN=$(jq -r '.choices[0].message.content // empty' "$RESPONSE_FILE" 2>/dev/null)
+  [ -z "$CLEAN" ] && echo "  ⚠️ Empty response" && continue
+
+  THOUGHT=$(echo "$CLEAN" | jq -r '.thought // "thinking..."' 2>/dev/null)
+  echo "  💭 $THOUGHT"
+
+  DONE_MSG=$(echo "$CLEAN" | jq -r '.actions[]? | select(.action=="done") | .message // empty' 2>/dev/null)
+  if [ -n "$DONE_MSG" ]; then
+      echo ""
+      echo "  ✅ DONE: $DONE_MSG"
+      break
+  fi
+
+  ACTION_COUNT=$(echo "$CLEAN" | jq '.actions | length' 2>/dev/null | grep -o '[0-9]*' | head -1)
+  [ -z "$ACTION_COUNT" ] && ACTION_COUNT=0
+  i=0
+  while [ "$i" -lt "$ACTION_COUNT" ]; do
+      ACTION=$(echo "$CLEAN" | jq -r ".actions[$i].action // empty" 2>/dev/null)
+      case "$ACTION" in
+          tap)
+              X=$(echo "$CLEAN" | jq -r ".actions[$i].x" 2>/dev/null)
+              Y=$(echo "$CLEAN" | jq -r ".actions[$i].y" 2>/dev/null)
+              [ -n "$X" ] && [ -n "$Y" ] && do_action "tap" "$X" "$Y"
+              ;;
+          swipe)
+              X1=$(echo "$CLEAN" | jq -r ".actions[$i].x1" 2>/dev/null)
+              Y1=$(echo "$CLEAN" | jq -r ".actions[$i].y1" 2>/dev/null)
+              X2=$(echo "$CLEAN" | jq -r ".actions[$i].x2" 2>/dev/null)
+              Y2=$(echo "$CLEAN" | jq -r ".actions[$i].y2" 2>/dev/null)
+              [ -n "$X1" ] && do_action "swipe" "$X1" "$Y1" "$X2" "$Y2"
+              ;;
+          type)
+              TYPE_TEXT=$(echo "$CLEAN" | jq -r ".actions[$i].text // empty" 2>/dev/null)
+              [ -n "$TYPE_TEXT" ] && do_action "type" "$TYPE_TEXT"
+              ;;
+          key)
+              KEY_CODE=$(echo "$CLEAN" | jq -r ".actions[$i].code" 2>/dev/null)
+              [ -n "$KEY_CODE" ] && do_action "key" "$KEY_CODE"
+              ;;
+          open_app)
+              PKG=$(echo "$CLEAN" | jq -r ".actions[$i].package // empty" 2>/dev/null)
+              [ -n "$PKG" ] && do_action "open_app" "$PKG"
+              ;;
+          scroll_down) do_action "scroll_down" ;;
+          scroll_up)   do_action "scroll_up"   ;;
+          go_home)     do_action "go_home"     ;;
+          go_back)     do_action "go_back"     ;;
+          wait)
+              WAIT_SECS=$(echo "$CLEAN" | jq -r ".actions[$i].seconds // 1" 2>/dev/null)
+              do_action "wait" "$WAIT_SECS"
+              ;;
+      esac
+      i=$((i + 1))
+  done
+
+  HISTORY="Previous step $STEP: ${THOUGHT}. "
+  sleep 1
+done
+
+rm -f "$PAYLOAD_FILE" "$RESPONSE_FILE" 2>/dev/null
+echo ""
+echo "🏁 Agent finished ($STEP steps)"
+
+EOF
+chmod +x ~/phone_agent.sh
+echo "✅ phone_agent.sh created at ~/phone_agent.sh"

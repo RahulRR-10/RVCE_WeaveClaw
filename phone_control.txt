@@ -1,0 +1,977 @@
+cat > ~/phone_control.sh << 'EOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+
+CMD="$1"
+shift
+
+RISH_PATH="$HOME/bin/rish"
+# --- Robust privilege detection ---
+PRIV="none"
+PRIV_CMD="eval"
+
+# Try Shizuku (retry 2 times to avoid race condition)
+if command -v rish >/dev/null 2>&1; then
+  for i in 1 2; do
+    if rish -c id >/dev/null 2>&1; then
+      PRIV="shizuku"
+      PRIV_CMD="rish -c"
+      break
+    fi
+    sleep 0.5
+  done
+fi
+
+# Fallback to root
+if [ "$PRIV" = "none" ] && command -v su >/dev/null 2>&1; then
+  if su -c id >/dev/null 2>&1; then
+    PRIV="root"
+    PRIV_CMD="su -c"
+  fi
+fi
+
+run_cmd()     { $PRIV_CMD "$1" 2>/dev/null; }
+run_cmd_err() { $PRIV_CMD "$1"; }
+
+SCREEN_SIZE=$(run_cmd "wm size" | grep -o '[0-9]*x[0-9]*' | tail -1)
+SCREEN_W=$(echo "$SCREEN_SIZE" | cut -dx -f1)
+SCREEN_H=$(echo "$SCREEN_SIZE" | cut -dx -f2)
+[ -z "$SCREEN_W" ] && SCREEN_W=1080
+[ -z "$SCREEN_H" ] && SCREEN_H=2400
+CENTER_X=$((SCREEN_W / 2))
+CENTER_Y=$((SCREEN_H / 2))
+
+case "$CMD" in
+
+  # ── Input ──────────────────────────────────────────────
+  tap)
+    run_cmd "input tap $1 $2"
+    echo "👆 Tapped ($1, $2)"
+    ;;
+
+  tap-center)
+    run_cmd "input tap $CENTER_X $CENTER_Y"
+    echo "👆 Tapped center ($CENTER_X, $CENTER_Y)"
+    ;;
+
+  swipe)
+    run_cmd "input swipe $1 $2 $3 $4 ${5:-300}"
+    echo "👆 Swiped ($1,$2) → ($3,$4)"
+    ;;
+
+  scroll-down)
+    run_cmd "input swipe $CENTER_X $((SCREEN_H*7/10)) $CENTER_X $((SCREEN_H*3/10)) 300"
+    echo "⬇️ Scrolled down"
+    ;;
+
+  scroll-up)
+    run_cmd "input swipe $CENTER_X $((SCREEN_H*3/10)) $CENTER_X $((SCREEN_H*7/10)) 300"
+    echo "⬆️ Scrolled up"
+    ;;
+
+  scroll-left)
+    run_cmd "input swipe $((SCREEN_W*8/10)) $CENTER_Y $((SCREEN_W*2/10)) $CENTER_Y 300"
+    echo "⬅️ Scrolled left"
+    ;;
+
+  scroll-right)
+    run_cmd "input swipe $((SCREEN_W*2/10)) $CENTER_Y $((SCREEN_W*8/10)) $CENTER_Y 300"
+    echo "➡️ Scrolled right"
+    ;;
+
+  type)
+    ESCAPED=$(echo "$*" | sed 's/ /%s/g; s/&/\\&/g')
+    run_cmd "input text '$ESCAPED'"
+    echo "⌨️ Typed: $*"
+    ;;
+
+  key)
+    run_cmd "input keyevent $1"
+    echo "🔘 Key: $1"
+    ;;
+
+  long-press)
+    run_cmd "input swipe $1 $2 $1 $2 800"
+    echo "👇 Long-pressed ($1, $2)"
+    ;;
+
+  # ── Navigation ─────────────────────────────────────────
+  home)    run_cmd "input keyevent 3";   echo "🏠 Home" ;;
+  back)    run_cmd "input keyevent 4";   echo "◀️ Back" ;;
+  recents) run_cmd "input keyevent 187"; echo "⬛ Recents" ;;
+  wake)    run_cmd "input keyevent 224"; echo "👀 Screen on" ;;
+  sleep)   run_cmd "input keyevent 26";  echo "💤 Screen off" ;;
+  enter)   run_cmd "input keyevent 66";  echo "↩️ Enter" ;;
+
+  # ── Apps ───────────────────────────────────────────────
+  open-app)
+    run_cmd "monkey -p $1 -c android.intent.category.LAUNCHER 1"
+    echo "📱 Opened: $1"
+    ;;
+
+  kill-app)
+    run_cmd "am force-stop $1"
+    echo "❌ Killed: $1"
+    ;;
+
+  open-url)
+    run_cmd "am start -a android.intent.action.VIEW -d '$1'"
+    echo "🌐 Opened: $1"
+    ;;
+
+  clear-data)
+    run_cmd "pm clear $1"
+    echo "🧹 Cleared data: $1"
+    ;;
+
+  list-apps)
+    run_cmd "pm list packages -3" | cut -d':' -f2 | sort
+    echo "📦 Done"
+    ;;
+
+  current-app)
+    run_cmd "dumpsys window windows" | grep 'mCurrentFocus'
+    ;;
+
+  camera)
+    run_cmd "am start -a android.media.action.IMAGE_CAPTURE"
+    echo "📸 Camera opened"
+    ;;
+
+  # ── System ─────────────────────────────────────────────
+  battery)
+    run_cmd "dumpsys battery" | grep -E "level|status|plugged|temperature"
+    ;;
+
+  brightness)
+    run_cmd "settings put system screen_brightness $1"
+    echo "🔆 Brightness: $1/255"
+    ;;
+
+  wifi)
+    case "$1" in
+      on)  run_cmd "svc wifi enable";  echo "📶 WiFi on"  ;;
+      off) run_cmd "svc wifi disable"; echo "📵 WiFi off" ;;
+      *)   run_cmd "dumpsys wifi" | grep "mNetworkInfo" | head -1 ;;
+    esac
+    ;;
+
+  bluetooth)
+    case "$1" in
+      on)  run_cmd "svc bluetooth enable";  echo "🔵 BT on"  ;;
+      off) run_cmd "svc bluetooth disable"; echo "🔵 BT off" ;;
+    esac
+    ;;
+
+  airplane)
+    case "$1" in
+      on)
+        run_cmd "settings put global airplane_mode_on 1"
+        run_cmd "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true"
+        echo "✈️ Airplane on"
+        ;;
+      off)
+        run_cmd "settings put global airplane_mode_on 0"
+        run_cmd "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false"
+        echo "✈️ Airplane off"
+        ;;
+    esac
+    ;;
+
+dnd)
+    echo "🔽 Pulling down notification menu..."
+    # 1. Swipe from top edge down to the center
+    run_cmd "input swipe $CENTER_X 0 $CENTER_X $((SCREEN_H / 2)) 300"
+    sleep 1 # Crucial: Wait for the menu animation to finish expanding
+
+    echo "🔕 Tapping DND toggle at (789, 350)..."
+    # 2. Tap your specific DND coordinate
+    run_cmd "input tap 789 350"
+    sleep 0.5 # Wait for the tap to register and UI to update
+
+    echo "🔼 Swiping up to close..."
+    # 3. Swipe from center back to the top edge
+    run_cmd "input swipe $CENTER_X $((SCREEN_H / 2)) $CENTER_X 0 300"
+    echo "✅ DND sequence complete."
+    ;;
+
+  vol-up)   run_cmd "input keyevent 24";  echo "🔊 Volume up"   ;;
+  vol-down) run_cmd "input keyevent 25";  echo "🔉 Volume down" ;;
+  mute)     run_cmd "input keyevent 164"; echo "🔇 Mute toggled" ;;
+
+  notifications)  run_cmd "cmd statusbar expand-notifications"; echo "🔽 Notifications open" ;;
+  quick-settings) run_cmd "cmd statusbar expand-settings";      echo "🎛️ Quick settings open" ;;
+  close-panels)   run_cmd "cmd statusbar collapse";             echo "🔼 Panels closed" ;;
+
+  device-info)
+    MODEL=$(run_cmd "getprop ro.product.model")
+    OS=$(run_cmd "getprop ro.build.version.release")
+    BRAND=$(run_cmd "getprop ro.product.brand")
+    echo "📱 $BRAND $MODEL (Android $OS) — ${SCREEN_W}x${SCREEN_H} via $PRIV"
+    ;;
+
+  # ── Screenshot & UI ────────────────────────────────────
+  screenshot)
+    FILENAME="${1:-/sdcard/screenshot_$(date +%s).png}"
+    run_cmd "screencap -p $FILENAME"
+    echo "📸 Saved: $FILENAME"
+    ;;
+
+  ui-dump)
+    run_cmd "uiautomator dump /sdcard/ui.xml" >/dev/null
+    run_cmd "cat /sdcard/ui.xml" \
+      | grep -oE '(text|content-desc)="[^"]*"[^>]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
+      | head -100 \
+      | while read -r line; do
+          txt=$(echo "$line" | sed -n 's/.*text="\([^"]*\)".*/\1/p')
+          [ -z "$txt" ] && txt=$(echo "$line" | sed -n 's/.*content-desc="\([^"]*\)".*/\1/p')
+          bnds=$(echo "$line" | sed -n 's/.*bounds="\([^"]*\)".*/\1/p')
+          x1=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $1}' | cut -d, -f1)
+          y1=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $1}' | cut -d, -f2)
+          x2=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $2}' | cut -d, -f1)
+          y2=$(echo "$bnds" | sed 's/\[//g;s/\]/ /g' | awk '{print $2}' | cut -d, -f2)
+          if [ -n "$x1" ] && [ -n "$y1" ] && [ -n "$x2" ] && [ -n "$y2" ]; then
+              cx=$(( (x1 + x2) / 2 )); cy=$(( (y1 + y2) / 2 ))
+              [ -n "$txt" ] && echo "  ${txt:0:30} → ($cx, $cy)"
+          fi
+        done
+    ;;
+
+  clipboard)
+    run_cmd "am broadcast -a clipper.set -e text '$*'"
+    echo "📋 Clipboard set: $*"
+    ;;
+
+# ── Calendar ───────────────────────────────────────────
+  calendar)
+    # Usage: calendar [start_date] [end_date] (Format: YYYY-MM-DD or "tomorrow")
+    # Example: bash ~/phone_control.sh calendar "2026-06-12" "2026-06-15"
+    START_DATE="${1:-tomorrow}"
+    END_DATE="${2:-$START_DATE}"
+
+    START_MS=$(date -d "$START_DATE 00:00:00" +%s000)
+    END_MS=$(date -d "$END_DATE 23:59:59" +%s000)
+
+    echo "📅 Bookings & Events from $START_DATE to $END_DATE:"
+
+    # Reverted to the reliable 'events' table, but keeping your upgraded data fields!
+    run_cmd "content query --uri content://com.android.calendar/events --projection title:dtstart:allDay:eventLocation:calendar_displayName --where \"deleted=0 AND dtstart >= $START_MS AND dtstart <= $END_MS\" --sort \"dtstart ASC\"" | while read -r line; do
+      
+      # Using grep + cut is much safer than sed if fields contain commas
+      TITLE=$(echo "$line" | grep -o 'title=[^,]*' | cut -d= -f2)
+      EVT_START=$(echo "$line" | grep -o 'dtstart=[^,]*' | cut -d= -f2)
+      ALL_DAY=$(echo "$line" | grep -o 'allDay=[^,]*' | cut -d= -f2)
+      LOCATION=$(echo "$line" | grep -o 'eventLocation=[^,]*' | cut -d= -f2)
+      CAL_NAME=$(echo "$line" | grep -o 'calendar_displayName=[^,]*' | cut -d= -f2)
+
+      [ -z "$TITLE" ] && continue
+      [ -z "$EVT_START" ] && continue
+      [ "$TITLE" = "null" ] && continue # Skip empty database entries
+
+      START_SEC=$((EVT_START / 1000))
+      
+      if [ "$ALL_DAY" = "1" ]; then
+        TIME_FORMATTED=$(date -d "@$START_SEC" "+%b %d, All day")
+      else
+        TIME_FORMATTED=$(date -d "@$START_SEC" "+%b %d, %I:%M %p")
+      fi
+
+      # Clean up potential literal "null" strings returned by SQLite
+      [ "$LOCATION" = "null" ] && LOCATION=""
+      [ "$CAL_NAME" = "null" ] && CAL_NAME=""
+
+      if [ -n "$LOCATION" ]; then
+        if [ -n "$CAL_NAME" ]; then
+          echo "  - $TIME_FORMATTED: $TITLE [$CAL_NAME] @ $LOCATION"
+        else
+          echo "  - $TIME_FORMATTED: $TITLE @ $LOCATION"
+        fi
+      else
+        if [ -n "$CAL_NAME" ]; then
+          echo "  - $TIME_FORMATTED: $TITLE [$CAL_NAME]"
+        else
+          echo "  - $TIME_FORMATTED: $TITLE"
+        fi
+      fi
+    done
+    ;;
+
+  # ── Clock ──────────────────────────────────────────────
+  clock)
+    CLOCK_CMD="$1"
+    shift
+    case "$CLOCK_CMD" in
+
+      open)
+        # Open the clock app main screen
+        run_cmd "am start -n com.google.android.deskclock/com.android.deskclock.DeskClock"
+        echo "🕐 Clock app opened"
+        ;;
+
+      alarm)
+        # Usage: clock alarm <hour> <minute> [label] [days]
+        # days = MON,TUE,WED,THU,FRI,SAT,SUN (comma separated, optional)
+        HOUR="$1"
+        MIN="$2"
+        LABEL="${3:-Alarm}"
+        DAYS="$4"
+
+        if [ -z "$HOUR" ] || [ -z "$MIN" ]; then
+          echo "Usage: clock alarm <hour> <minute> [label] [days e.g. MON,WED,FRI]"
+          exit 1
+        fi
+
+        # Convert day names to bitmask (Android uses Calendar constants)
+        # SUN=1 MON=2 TUE=4 WED=8 THU=16 FRI=32 SAT=64
+        DAYS_ARG=""
+        if [ -n "$DAYS" ]; then
+          MASK=0
+          echo "$DAYS" | tr ',' '\n' | while read -r day; do
+            case "$day" in
+              SUN) MASK=$((MASK|1))  ;;
+              MON) MASK=$((MASK|2))  ;;
+              TUE) MASK=$((MASK|4))  ;;
+              WED) MASK=$((MASK|8))  ;;
+              THU) MASK=$((MASK|16)) ;;
+              FRI) MASK=$((MASK|32)) ;;
+              SAT) MASK=$((MASK|64)) ;;
+            esac
+            echo $MASK
+          done | tail -1
+          # Re-calculate since subshell can't export
+          MASK=0
+          for day in $(echo "$DAYS" | tr ',' ' '); do
+            case "$day" in
+              SUN) MASK=$((MASK|1))  ;;
+              MON) MASK=$((MASK|2))  ;;
+              TUE) MASK=$((MASK|4))  ;;
+              WED) MASK=$((MASK|8))  ;;
+              THU) MASK=$((MASK|16)) ;;
+              FRI) MASK=$((MASK|32)) ;;
+              SAT) MASK=$((MASK|64)) ;;
+            esac
+          done
+          DAYS_ARG="--ei android.intent.extra.alarm.DAYS $MASK"
+        fi
+
+        run_cmd "am start -a android.intent.action.SET_ALARM \
+          --ei android.intent.extra.alarm.HOUR $HOUR \
+          --ei android.intent.extra.alarm.MINUTES $MIN \
+          --es android.intent.extra.alarm.MESSAGE '$LABEL' \
+          --ez android.intent.extra.alarm.SKIP_UI true \
+          $DAYS_ARG"
+        echo "⏰ Alarm set: ${HOUR}:$(printf '%02d' $MIN) — $LABEL${DAYS:+ ($DAYS)}"
+        ;;
+
+      alarm-open)
+        # Open clock app directly to alarms tab
+        run_cmd "am start -a android.intent.action.SHOW_ALARMS"
+        echo "⏰ Alarms tab opened"
+        ;;
+
+      alarm-delete)
+        # Delete next upcoming alarm via intent
+        run_cmd "am start -a android.intent.action.DISMISS_ALARM \
+          --ez android.intent.extra.alarm.SKIP_UI true"
+        echo "🗑️ Next alarm dismissed"
+        ;;
+
+      alarm-snooze)
+        run_cmd "am start -a android.intent.action.SNOOZE_ALARM"
+        echo "😴 Alarm snoozed"
+        ;;
+
+      timer)
+        # Usage: clock timer <minutes> [seconds] [label]
+        TMIN="${1:-1}"
+        TSEC="${2:-0}"
+        TLABEL="${3:-Timer}"
+        TOTAL_SEC=$(( (TMIN * 60) + TSEC ))
+
+        run_cmd "am start -a android.intent.action.SET_TIMER \
+          --ei android.intent.extra.alarm.LENGTH $TOTAL_SEC \
+          --es android.intent.extra.alarm.MESSAGE '$TLABEL' \
+          --ez android.intent.extra.alarm.SKIP_UI true"
+        echo "⏱️ Timer set: ${TMIN}m ${TSEC}s — $TLABEL"
+        ;;
+
+      timer-open)
+        # Open clock app directly to timer tab
+        run_cmd "am start -a android.intent.action.SHOW_TIMERS"
+        echo "⏱️ Timer tab opened"
+        ;;
+
+      stopwatch)
+        # Open clock app to stopwatch tab
+        run_cmd "am start -n com.google.android.deskclock/com.android.deskclock.DeskClock \
+          -e tab stopwatch"
+        echo "⏱️ Stopwatch opened"
+        ;;
+
+      worldclock)
+        run_cmd "am start -n com.google.android.deskclock/com.android.deskclock.DeskClock \
+          -e tab worldclock"
+        echo "🌍 World clock opened"
+        ;;
+
+      *)
+        echo "🕐 clock commands:"
+        echo "  clock open                         — open clock app"
+        echo "  clock alarm <H> <M> [label] [days] — set alarm silently"
+        echo "    days example: MON,WED,FRI"
+        echo "  clock alarm-open                   — open alarms tab"
+        echo "  clock alarm-delete                 — dismiss next alarm"
+        echo "  clock alarm-snooze                 — snooze active alarm"
+        echo "  clock timer <min> [sec] [label]    — set countdown timer"
+        echo "  clock timer-open                   — open timer tab"
+        echo "  clock stopwatch                    — open stopwatch"
+        echo "  clock worldclock                   — open world clock"
+        ;;
+    esac
+    ;;
+
+    lights)
+    LIGHT_CMD="$1"
+    PKG="com.findn.mrstar"
+    ACT="com.findn.ui.activity.MainActivity"
+
+    # Helper function to dynamically find and tap an element by ID (WITH RETRIES)
+    tap_id() {
+      local id=$1
+      local max_retries=3
+      local attempt=1
+      local bounds=""
+
+      while [ $attempt -le $max_retries ]; do
+        # Dump the UI state
+        run_cmd "uiautomator dump /sdcard/ui.xml" >/dev/null
+        
+        # Try to extract the bounds
+        bounds=$(run_cmd "cat /sdcard/ui.xml" | grep -o "resource-id=\"$id\"[^\>]*bounds=\"[^\"]*\"" | grep -o 'bounds="[^"]*"' | cut -d'"' -f2 | head -1)
+        
+        # If we found the bounds, break out of the loop immediately!
+        if [ -n "$bounds" ]; then
+          break 
+        fi
+        
+        # If not found, wait a moment and try again
+        echo "⏳ UI not ready, retrying... ($attempt/$max_retries)"
+        sleep 1.5
+        attempt=$((attempt + 1))
+      done
+      
+      if [ -n "$bounds" ]; then
+        local x1=$(echo "$bounds" | cut -d'[' -f2 | cut -d',' -f1)
+        local y1=$(echo "$bounds" | cut -d',' -f2 | cut -d']' -f1)
+        local x2=$(echo "$bounds" | cut -d'[' -f3 | cut -d',' -f1)
+        local y2=$(echo "$bounds" | cut -d',' -f3 | cut -d']' -f1)
+        local cx=$(( (x1 + x2) / 2 ))
+        local cy=$(( (y1 + y2) / 2 ))
+        
+        # Simulate a 100ms human tap using a static swipe
+        run_cmd "input swipe $cx $cy $cx $cy 100"
+        
+        echo "💡 Tapped $id at ($cx, $cy)"
+      else
+        echo "⚠️ Error: Could not find $id on screen after $max_retries attempts."
+      fi
+    }
+
+    case "$LIGHT_CMD" in
+      open)
+        run_cmd "am start -n $PKG/$ACT"
+        echo "💡 MR Star opened"
+        ;;
+      power)
+        run_cmd "am start -n $PKG/$ACT"
+        sleep 2 # Wait for app to render
+        tap_id "com.findn.mrstar:id/cb_power"
+        ;;
+      color)
+        # Default to red if no color is passed
+        COLOR_NAME="${2:-red}" 
+        run_cmd "am start -n $PKG/$ACT"
+        sleep 1.5 # Shorter wait since we aren't dumping the UI
+        
+        # FIX: Removed 'local' since this isn't inside a function
+        cx=""
+        cy=2056
+        
+        case "$COLOR_NAME" in
+          red)    cx=275 ;;
+          yellow) cx=383 ;;
+          green)  cx=482 ;;
+          cyan)   cx=587 ;;
+          blue)   cx=679 ;;
+          pink)   cx=778 ;;
+          *)
+            echo "⚠️ Unknown color '$COLOR_NAME'. Defaulting to red."
+            cx=275
+            ;;
+        esac
+
+        # Simulate a 100ms human tap at direct coordinates
+        run_cmd "input swipe $cx $cy $cx $cy 100"
+        echo "💡 Tapped $COLOR_NAME at ($cx, $cy)"
+        ;;
+      *)
+        echo "💡 lights commands:"
+        echo "  lights open             — Open the MR Star app"
+        echo "  lights power            — Toggle the power button"
+        echo "  lights color [name]     — Tap a color (red, yellow, green, cyan, blue, pink)"
+        ;;
+    esac
+    ;;        
+
+# # ── Notepad (atomczak) ─────────────────────────────────
+  notes)
+    NOTE_CMD="$1"
+    shift
+    PKG="com.atomczak.notepat"
+
+    # Helper 1: Tap by Resource ID
+    tap_id() {
+      local id=$1
+      local max_retries=3
+      local attempt=1
+      local bounds=""
+
+      while [ $attempt -le $max_retries ]; do
+        run_cmd "uiautomator dump /sdcard/ui.xml" >/dev/null
+        bounds=$(run_cmd "cat /sdcard/ui.xml" | grep -o "resource-id=\"$id\"[^\>]*bounds=\"[^\"]*\"" | grep -o 'bounds="[^"]*"' | cut -d'"' -f2 | head -1)
+        if [ -n "$bounds" ]; then break; fi
+        sleep 1
+        attempt=$((attempt + 1))
+      done
+      
+      if [ -n "$bounds" ]; then
+        local x1=$(echo "$bounds" | cut -d'[' -f2 | cut -d',' -f1)
+        local y1=$(echo "$bounds" | cut -d',' -f2 | cut -d']' -f1)
+        local x2=$(echo "$bounds" | cut -d'[' -f3 | cut -d',' -f1)
+        local y2=$(echo "$bounds" | cut -d',' -f3 | cut -d']' -f1)
+        run_cmd "input tap $(( (x1 + x2) / 2 )) $(( (y1 + y2) / 2 ))"
+        return 0
+      else
+        echo "⚠️ Error: Could not find ID $id"
+        return 1
+      fi
+    }
+
+    # Helper 2: Tap by visible text OR content-desc
+    tap_text() {
+      local search_txt="$1"
+      local max_retries=3
+      local attempt=1
+      local bounds=""
+
+      while [ $attempt -le $max_retries ]; do
+        run_cmd "uiautomator dump /sdcard/ui.xml" >/dev/null
+        bounds=$(run_cmd "cat /sdcard/ui.xml" | grep -ioE "(text|content-desc)=\"[^\"]*$search_txt[^\"]*\"[^\>]*bounds=\"[^\"]*\"" | grep -o 'bounds="[^"]*"' | cut -d'"' -f2 | head -1)
+        if [ -n "$bounds" ]; then break; fi
+        sleep 1
+        attempt=$((attempt + 1))
+      done
+      
+      if [ -n "$bounds" ]; then
+        local x1=$(echo "$bounds" | cut -d'[' -f2 | cut -d',' -f1)
+        local y1=$(echo "$bounds" | cut -d',' -f2 | cut -d']' -f1)
+        local x2=$(echo "$bounds" | cut -d'[' -f3 | cut -d',' -f1)
+        local y2=$(echo "$bounds" | cut -d',' -f3 | cut -d']' -f1)
+        run_cmd "input tap $(( (x1 + x2) / 2 )) $(( (y1 + y2) / 2 ))"
+        return 0
+      else
+        echo "⚠️ Error: Could not find text or icon '$search_txt' on screen."
+        return 1
+      fi
+    }
+
+
+    # Helper 3: Robust Long Text Typer (Batched + Stdin Safe + Buffer Limit Safe)
+    type_safely() {
+      while IFS= read -r line || [ -n "$line" ]; do
+        if [ -z "$line" ]; then
+          run_cmd "input keyevent 66" </dev/null
+          continue
+        fi
+
+        clean_line=$(echo "$line" | tr -cd '\40-\176')
+        local i=0
+        local chunk_size=60
+        local batch_cmd=""
+        local batch_count=0
+
+        while [ $i -lt ${#clean_line} ]; do
+          local chunk="${clean_line:$i:$chunk_size}"
+          
+          local escaped=$(echo "$chunk" | sed 's/ /%s/g' | sed "s/'/'\\\\''/g")
+          
+          if [ -n "$escaped" ]; then
+            batch_cmd="$batch_cmd input text '$escaped'; sleep 0.15; "
+            batch_count=$((batch_count + 1))
+          fi
+          
+          i=$((i + chunk_size))
+          
+          # The Magic Fix: Execute and flush every 5 chunks to avoid Android's character limit
+          if [ $batch_count -ge 5 ]; then
+            run_cmd "$batch_cmd" </dev/null
+            batch_cmd=""
+            batch_count=0
+          fi
+        done
+        
+        # Flush whatever is left at the end of the line and hit Enter
+        batch_cmd="$batch_cmd input keyevent 66;"
+        run_cmd "$batch_cmd" </dev/null
+        
+        sleep 0.2
+      done <<< "$1"
+    }
+
+    case "$NOTE_CMD" in
+      app)
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        echo "📱 Notepad opened"
+        ;;
+        
+      search)
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        sleep 2
+        if tap_id "com.atomczak.notepat:id/action_search" || tap_id "com.atomczak.notepat:id/menu_search" || tap_text "Search"; then
+          sleep 1
+          type_safely "$*"
+          run_cmd "input keyevent 66" 
+          echo "🔍 Searching for: $*"
+        else
+           echo "⚠️ Error: Could not trigger search UI."
+        fi
+        ;;
+
+      open)
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        sleep 2
+        if tap_text "$1"; then
+          echo "📖 Opened note containing: '$1'"
+        fi
+        ;;
+
+      append)
+        TARGET_NOTE="$1"
+        shift 
+        
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        sleep 2
+        
+        echo "⏳ Opening note '$TARGET_NOTE'..."
+        if tap_text "$TARGET_NOTE"; then
+          sleep 1.5
+          
+          # Move to the body and jump to the very end
+          run_cmd "input keyevent 20"
+          run_cmd "input keyevent 20"
+          run_cmd "input keyevent 123" # KEYCODE_MOVE_END
+          run_cmd "input keyevent 66"  # Newline
+          
+          # Safely type the text in chunks
+          type_safely "$*"
+          sleep 1
+          
+          # Save and exit
+          run_cmd "input keyevent 4"
+          run_cmd "input keyevent 4"
+          echo "💾 Appended text and auto-saved."
+        fi
+        ;;
+
+      create)
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        sleep 2
+        tap_id "com.atomczak.notepat:id/new_note_fab"
+        sleep 1
+        
+        if [ -n "$2" ]; then
+          # Two arguments: Title and Body
+          type_safely "$1"
+          sleep 0.5
+          run_cmd "input keyevent 20" # Move down to body
+          sleep 0.5
+          type_safely "$2"
+          echo "📝 Created note: '$1'"
+        else
+          # One argument: Body only
+          run_cmd "input keyevent 20" # Skip title
+          sleep 0.5
+          type_safely "$1"
+          echo "📝 Created note body: (No Title)"
+        fi
+        
+        sleep 1
+        run_cmd "input keyevent 4"
+        run_cmd "input keyevent 4"
+        echo "💾 Note auto-saved"
+        ;;
+        
+      read)
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        sleep 2
+        echo "📖 Recent notes on screen:"
+        run_cmd "uiautomator dump /sdcard/ui.xml" >/dev/null
+        run_cmd "cat /sdcard/ui.xml" \
+          | grep -oE 'text="[^"]+"' \
+          | cut -d'"' -f2 \
+          | grep -vE '^(Notepad|New note|Search)$' \
+          | head -10 \
+          | while read -r line; do echo "  - $line"; done
+        ;;
+        
+      *)
+        echo "📝 notes commands:"
+        echo "  notes app                      — Open the app"
+        echo "  notes read                     — List visible notes"
+        echo "  notes search <query>           — Search your notes"
+        echo "  notes open <title>             — Tap a note to open it"
+        echo "  notes create [title] <body>    — Make a new note"
+        echo "  notes append <title> <text>    — Add text to end of an existing note"
+        ;;
+    esac
+    ;;
+    
+  # ── Wipro Next Smart Home (FAST STATIC MODE) ────────────────────────
+  wipro)
+    WIPRO_CMD="$1"
+    PKG="wipro.com"
+
+    # Helper: Instant tap on your dashboard light
+    ensure_control_screen() {
+      # ⚠️ REPLACE '500 500' WITH THE ACTUAL COORDINATES OF YOUR LIGHT ON THE DASHBOARD
+      run_cmd "input tap 500 500"
+      sleep 1 # Short wait for the control menu to slide up
+    }
+
+    case "$WIPRO_CMD" in
+      open)
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        echo "📱 Opened Wipro App"
+        ;;
+
+      color)
+        # Usage: wipro color blink | red | green | white
+        run_cmd "monkey -p $PKG -c android.intent.category.LAUNCHER 1"
+        sleep 1.5
+        ensure_control_screen
+        case "$2" in
+          blink) run_cmd "input tap 288 734" ;;
+          red)   run_cmd "input tap 749 727" ;;
+          green) run_cmd "input tap 267 1011" ;;
+          white) run_cmd "input tap 767 1024" ;;
+          *) echo "Usage: wipro color [blink|red|green|white]" ;;
+        esac
+        echo "🎨 Set color to $2"
+        ;;
+
+      *)
+        echo "💡 Wipro commands (Fast Mode):"
+        echo "  wipro open            — Open the app"
+        echo "  wipro color [name]    — Set color (blink, red, green, white)"
+        ;;
+    esac
+    ;;
+
+# ── Travel Text (Telegram + Live Location) ──────────────
+  travel-text)
+        # Usage: travel-text <username_or_phone> <message>
+        TARGET="$1"
+        shift
+        MESSAGE="$*"
+
+        if [ -z "$TARGET" ]  [ -z "$MESSAGE" ]; then
+          echo "Usage: travel-text <username_or_phone> <message>"
+          exit 1
+        fi
+
+        telegram_type_safely() {
+          local text="$1"
+          local clean_line
+          clean_line=$(echo "$text" | tr -cd '\40-\176')
+          local i=0
+          local chunk_size=40
+
+          while [ $i -lt ${#clean_line} ]; do
+            local chunk="${clean_line:$i:$chunk_size}"
+            local escaped
+            escaped=$(printf '%s' "$chunk" | sed 's/ /%s/g' | sed "s/'/'\\''/g")
+            if [ -n "$escaped" ]; then
+              run_cmd "input text '$escaped'" </dev/null
+              sleep 0.2
+            fi
+            i=$((i + chunk_size))
+          done
+        }
+
+        # Determine if target is a phone number (numbers) or username (text)
+        if [[ "$TARGET" =~ ^[0-9]+$ ]]  || [[ "$TARGET" == +* ]]; then
+          CLEAN_NUM=$(echo "$TARGET" | tr -d '+')
+          run_cmd "am start -a android.intent.action.VIEW -d 'tg://resolve?phone=$CLEAN_NUM' -p org.telegram.messenger"
+        else
+          run_cmd "am start -a android.intent.action.VIEW -d 'tg://resolve?domain=$TARGET' -p org.telegram.messenger"
+        fi
+
+        echo "⏳ Opening Telegram chat for $TARGET..."
+        sleep 2.5
+
+        # Focus the message box after Telegram opens the chat
+        run_cmd "input tap 400 2278"
+        sleep 1
+
+        telegram_type_safely "$MESSAGE"
+        sleep 0.5
+
+        # Tap send explicitly after typing.
+        run_cmd "input tap 1000 1481"
+        echo "✉️ Sent text to $TARGET: $MESSAGE"
+        
+        # --- NEW LIVE LOCATION SEQUENCE ---
+        sleep 1.5 # Slight buffer to ensure the message sent before opening menus
+
+        echo "📍 Triggering Live Location sharing..."
+        
+        # 1. Click attachment/menu icon
+        run_cmd "input tap 902 1494"
+        sleep 1
+
+        # 2. Click 'Location' from the bottom sheet
+        run_cmd "input tap 429 2250"
+        sleep 1
+
+        # 3. Click 'Share My Live Location'
+        run_cmd "input tap 510 1829"
+        sleep 1
+
+        # 4. Click confirmation/duration send button
+        run_cmd "input tap 925 1715"
+        sleep 1
+
+        echo "✅ Live location sequence complete."
+        ;;
+
+  # ── Telegram ───────────────────────────────────────────
+  # ── Telegram (Hardcoded Coordinates) ───────────────────
+  telegram)
+        # Usage: telegram <username_or_phone> <message>
+        TARGET="$1"
+        shift
+        MESSAGE="$*"
+
+        if [ -z "$TARGET" ] || [ -z "$MESSAGE" ]; then
+          echo "Usage: telegram <username_or_phone> <message>"
+          exit 1
+        fi
+
+        telegram_type_safely() {
+          local text="$1"
+          local clean_line
+          clean_line=$(echo "$text" | tr -cd '\40-\176')
+          local i=0
+          local chunk_size=40
+
+          while [ $i -lt ${#clean_line} ]; do
+            local chunk="${clean_line:$i:$chunk_size}"
+            local escaped
+            escaped=$(printf '%s' "$chunk" | sed 's/ /%s/g' | sed "s/'/'\\''/g")
+            if [ -n "$escaped" ]; then
+              run_cmd "input text '$escaped'" </dev/null
+              sleep 0.2
+            fi
+            i=$((i + chunk_size))
+          done
+        }
+
+        # Determine if target is a phone number (numbers) or username (text)
+        if [[ "$TARGET" =~ ^[0-9]+$ ]] || [[ "$TARGET" == +* ]]; then
+          CLEAN_NUM=$(echo "$TARGET" | tr -d '+')
+          run_cmd "am start -a android.intent.action.VIEW -d 'tg://resolve?phone=$CLEAN_NUM' -p org.telegram.messenger"
+        else
+          run_cmd "am start -a android.intent.action.VIEW -d 'tg://resolve?domain=$TARGET' -p org.telegram.messenger"
+        fi
+
+        echo "⏳ Opening Telegram chat for $TARGET..."
+        sleep 2.5
+
+        # Focus the message box after Telegram opens the chat
+        run_cmd "input tap 400 2278"
+        sleep 1
+
+        telegram_type_safely "$MESSAGE"
+        sleep 0.5
+
+        # Tap send explicitly after typing.
+        run_cmd "input tap 1000 1481"
+
+        echo "✉️ Sent to $TARGET: $MESSAGE"
+        ;;
+
+youtube)
+    # Usage: youtube <search query>
+    QUERY="$*"
+    if [ -z "$QUERY" ]; then
+      echo "⚠️ Usage: youtube <search query>"
+      exit 1
+    fi
+
+    echo "🔍 Searching YouTube for: $QUERY"
+    
+    # 1. Format the query for a URL (replace spaces with '+')
+    SAFE_QUERY=$(echo "$QUERY" | tr ' ' '+')
+    
+    # 2. Use a standard VIEW deep link. This guarantees the app will open properly 
+    # whether it's closed, in the background, or already open.
+    run_cmd "am start -a android.intent.action.VIEW -d 'https://www.youtube.com/results?search_query=$SAFE_QUERY' -p com.google.android.youtube"
+    
+    # 3. Wait for the app and results to load
+    sleep 3.5 
+
+    # 4. Tap the first video
+    TARGET_X=$((SCREEN_W / 2))
+    TARGET_Y=$((SCREEN_H * 35 / 100))
+
+    run_cmd "input tap $TARGET_X $TARGET_Y"
+    echo "▶️ Tapped first result at ($TARGET_X, $TARGET_Y)"
+    ;;
+
+  # ── Help ───────────────────────────────────────────────
+  *)
+    echo "🤖 phone_control.sh — $PRIV (${SCREEN_W}x${SCREEN_H})"
+    echo ""
+    echo "Input:      tap x y | tap-center | long-press x y"
+    echo "            swipe x1 y1 x2 y2 [ms]"
+    echo "            scroll-down/up/left/right"
+    echo "            type text | key code | enter"
+    echo "Navigate:   home | back | recents | wake | sleep"
+    echo "Apps:       open-app pkg | kill-app pkg | open-url url"
+    echo "            clear-data pkg | list-apps | current-app | camera"
+    echo "System:     battery | brightness 0-255" | dnd
+    echo "            wifi on/off | bluetooth on/off | airplane on/off"
+    echo "            vol-up/down | mute | device-info"
+    echo "UI:         screenshot [path] | ui-dump | clipboard text"
+    echo "            notifications | quick-settings | close-panels"
+    echo "Calendar:   calendar [start_date] [end_date] (Format: YYYY-MM-DD or tomorrow)"
+    echo "Clock:      clock open | clock alarm H M [label] [days]"
+    echo "            clock alarm-open | clock alarm-list"
+    echo "            clock alarm-delete | clock alarm-snooze"
+    echo "            clock timer min [sec] [label] | clock timer-open"
+    echo "            clock stopwatch | clock worldclock"
+    echo "💡 lights commands:"
+    echo "  lights open             — Open the MR Star app"
+    echo "  lights power            — Toggle the power button"
+    echo "  lights color [preset]   — Tap a preset color (e.g., 11 for ccb_11)"
+    echo "📝 notes commands:"
+    echo "Notes:      notes app | notes read"
+    echo "            notes search <query> | notes open <title>"
+    echo "            notes create [title] <body>"
+    echo "            notes append <title> <text>"
+    ;;
+esac
+
+EOF
+chmod +x ~/phone_control.sh
+echo "✅ phone_control.sh installed"

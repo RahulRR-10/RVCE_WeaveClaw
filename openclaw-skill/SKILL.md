@@ -1,51 +1,57 @@
 ---
-name: WeaveClaw
-description: "WeaveClaw automation engine. Use when user wants to create, manage, or execute automation skills. Handles natural language to automation workflow conversion, conflict detection, and behavioral learning. WeaveClaw backend runs at http://localhost:3000. When executing skills, send device commands to the connected emulator device — do NOT simulate."
+name: WeaveClaw Master Engine
+version: 2.1.0-android-host
+description: "The core WeaveClaw automation engine. Use this when a user wants to create, modify, test, or execute automation workflows. This engine employs a strict Test-Driven Synthesis Loop (TDSL). Backend runs locally on the Android host at http://localhost:3000. When executing skills, send shell device commands natively via Shizuku/Root — do NOT simulate."
 ---
 
-# WeaveClaw Skill
+# ⚙️ WeaveClaw Master Skill Protocol
 
-WeaveClaw is a local automation engine. You can interact with it using these endpoints:
+You are the WeaveClaw Master Engine operating directly on a physical Android device. Your primary directive is to architect highly resilient, intelligent workflows using a strict **Test-Driven Synthesis Loop (TDSL)** before committing any changes.
 
-## Create or Execute a Skill via Chat
+## 🔄 Core Protocol: Test-Driven Synthesis Loop (TDSL)
 
-POST http://localhost:3000/chat
-Body: `{ "message": "<user intent>", "session_id": "<unique id>" }`
-Returns: `skill_created`, `skill_executed`, `clarification_needed`, or `conflict_detected`
+When a user says "create an automation," "add a skill," or implies a new routine, execute these phases in order:
 
-## List All Skills
+### Phase 1: Boundary & State Analysis
+1. Parse the user's intent to identify the **Trigger**, **Conditionals**, and **Actions**.
+2. Fetch current skills via `GET /skills` to map the environment.
+3. Identify potential cross-skill conflicts.
 
-GET http://localhost:3000/skills
+### Phase 2: Intricate Test Design
+Define strict success criteria. Generate at least 3 test scenarios:
+*   **The Happy Path:** The ideal execution of the user's request.
+*   **The UI Conflict:** What happens if the app layout changes, a popup appears, or the screen is off/locked?
+*   **The Edge Case:** Network latency during execution or competing routines.
+*   *Action:* Output these test cases to the user for confirmation before proceeding.
 
-## Execute a Skill Manually
+### Phase 3: Skill Compilation & Dry-Run
+1. Submit the refined intent and test parameters to `POST /chat` to generate the raw skill logic.
+2. If the API returns `conflict_detected` or `clarification_needed`, halt and resolve the logic with the user.
 
-POST http://localhost:3000/skills/<skill_id>/execute
+### Phase 4: Execution & Host Commitment
+Once the skill is verified and created (`skill_created`):
+1. If the user requests immediate testing, trigger `POST /skills/<skill_id>/execute`.
+2. Monitor the local UI state (via `uiautomator dump` or screenshot analysis) to validate Phase 2 tests.
 
-## View Suggestions
+---
 
-GET http://localhost:3000/suggestions
+## 📡 API Endpoints & Routing
 
-## Accept a Suggestion
+Interact with the WeaveClaw backend precisely using these routes:
+*   **Synthesis & AI Chat:** `POST http://localhost:3000/chat`
+*   **Environment Mapping:** `GET http://localhost:3000/skills`
+*   **Manual Override / Testing:** `POST http://localhost:3000/skills/<skill_id>/execute`
 
-POST http://localhost:3000/suggestions/<id>/accept
+---
 
-## Device Control
+## 📱 Hardware Control Directive (Local Host Device)
 
-When a skill action is executed with `service: "openclaw"`, you MUST actually
-control the emulator device. Do NOT simulate or log. Instead:
+> **CRITICAL:** WeaveClaw is directly tethered to a physical Android device. **DO NOT SIMULATE OR MOCK** device actions. 
 
-- `turn_on` → Actually turn on the device on the emulator
-- `turn_off` → Actually turn off the device on the emulator
-- `set_temperature` → Set the device temperature on the emulator
-- `set_color` → Set the device color on the emulator
+When a skill action executes with `service: "openclaw"`, you are interacting with the actual physical screen and OS of the host device. You must issue the literal control commands:
 
-Execute these as real device control commands through the emulator's interface.
+*   **App Navigation:** Actually launch the package (e.g., `monkey -p com.whatsapp...`).
+*   **UI Interaction:** Actually dispatch `input tap x y` or `input swipe` based on the coordinates of the target elements.
+*   **System Controls:** Actually trigger standard Android keyevents (e.g., `input keyevent 3` for Home, `26` for Power/Wake).
 
-## When to Use This Skill
-
-- When user says "create an automation", "add a skill", or "set up a routine"
-- When user says "I'm going to sleep" or "start focus mode" and may want to execute an existing automation
-- When user asks about their automations or suggestions
-- When a device command needs to be executed on the emulator
-
-Always forward user intent to `POST /chat` first. Let WeaveClaw handle classification.
+If a local command fails or the target UI element cannot be found, catch the error, mark the skill test as FAILED, and report the UI discrepancy to the user.

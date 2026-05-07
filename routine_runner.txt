@@ -1,0 +1,173 @@
+cat << 'EOF' > ~/routine_runner.sh
+#!/data/data/com.termux/files/usr/bin/bash
+
+ROUTINES_FILE="$HOME/.openclaw/routines.json"
+
+if [ $# -lt 1 ]; then
+    echo "Usage: bash ~/routine_runner.sh <routine_name> --VAR1 \"value\" --VAR2 \"value\""
+    exit 1
+fi
+
+if [ ! -f "$ROUTINES_FILE" ]; then
+    echo "No routines file found at $ROUTINES_FILE"
+    exit 1
+fi
+
+# --- Parse arguments ---
+declare -A VARS
+ROUTINE_NAME="$1"
+shift
+
+while [ $# -ge 2 ]; do
+    case "$1" in
+        --*)
+            VAR_NAME=$(echo "$1" | sed 's/^--//')
+            VARS["$VAR_NAME"]="$2"
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            exit 1
+            ;;
+    esac
+    shift 2
+done
+
+# --- Validate routine exists ---
+ROUTINE_EXISTS=$(jq -r --arg name "$ROUTINE_NAME" '.routines | has($name)' "$ROUTINES_FILE")
+if [ "$ROUTINE_EXISTS" != "true" ]; then
+    echo "Routine '$ROUTINE_NAME' not found."
+    echo "Available routines:"
+    jq -r '.routines | keys[]' "$ROUTINES_FILE" | sed 's/^/  /'
+    exit 1
+fi
+
+# --- Validate required variables ---
+REQUIRED_VARS=$(jq -r --arg name "$ROUTINE_NAME" '.routines[$name].variables[]' "$ROUTINES_FILE" 2>/dev/null)
+if [ -n "$REQUIRED_VARS" ]; then
+    while IFS= read -r var; do
+        if [ -z "${VARS[$var]+x}" ]; then
+            echo "Missing required variable: $var"
+            echo "Required variables for '$ROUTINE_NAME':"
+            echo "$REQUIRED_VARS" | sed 's/^/  - /'
+            echo "Usage: bash ~/routine_runner.sh $ROUTINE_NAME --$var \"value\" ..."
+            exit 1
+        fi
+    done <<< "$REQUIRED_VARS"
+fi
+
+DESC=$(jq -r --arg name "$ROUTINE_NAME" '.routines[$name].description // "No description"' "$ROUTINES_FILE")
+CMD_COUNT=$(jq -r --arg name "$ROUTINE_NAME" '.routines[$name].commands | length' "$ROUTINES_FILE")
+
+echo "========================================"
+echo "  Running: $ROUTINE_NAME"
+echo "  Description: $DESC"
+echo "  Steps: $CMD_COUNT"
+# Print provided variables
+if [ ${#VARS[@]} -gt 0 ]; then
+    echo "  Variables:"
+    for key in "${!VARS[@]}"; do
+        echo "    {$key} = ${VARS[$key]}"
+    done
+fi
+echo "========================================"
+echo ""
+
+# --- Substitute helper ---
+substitute_vars() {
+    local input="$1"
+    for key in "${!VARS[@]}"; do
+        input=$(echo "$input" | sed "s|{${key}}|${VARS[$key]}|g")
+    done
+    echo "$input"
+}
+
+# --- Execute commands ---
+STEP=0
+FAILED=false
+while [ "$STEP" -lt "$CMD_COUNT" ]; do
+    TYPE=$(jq -r --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step].type' "$ROUTINES_FILE")
+
+    case "$TYPE" in
+        control)
+            ACTION=$(jq -r --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step].action' "$ROUTINES_FILE")
+            VALUE=$(jq -r --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step].value // empty' "$ROUTINES_FILE")
+            REPEAT=$(jq -r --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step].repeat // 1' "$ROUTINES_FILE")
+            HAS_ARGS=$(jq -r --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step] | has("args")' "$ROUTINES_FILE")
+
+            run_control_command() {
+                if [ "$HAS_ARGS" = "true" ]; then
+                    local args_json arg
+                    local -a cmd_args
+                    args_json=$(jq -c --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step].args' "$ROUTINES_FILE")
+                    while IFS= read -r arg; do
+                        arg=$(substitute_vars "$arg")
+                        cmd_args+=("$arg")
+                    done < <(jq -r '.[]' <<< "$args_json")
+                    bash ~/phone_control.sh "$ACTION" "${cmd_args[@]}"
+                elif [ -n "$VALUE" ]; then
+                    local substituted_value
+                    substituted_value=$(substitute_vars "$VALUE")
+                    # URL-encode {QUERY} values in deep links
+                    if echo "$substituted_value" | grep -q '{QUERY_URL}'; then
+                        for key in "${!VARS[@]}"; do
+                            ENCODED=$(echo "${VARS[$key]}" | sed 's/ /+/g; s/%/%25/g; s/#/%23/g')
+                            substituted_value=$(echo "$substituted_value" | sed "s|{QUERY_URL}|${ENCODED}|g")
+                        done
+                    fi
+                    bash ~/phone_control.sh "$ACTION" $substituted_value
+                else
+                    bash ~/phone_control.sh "$ACTION"
+                fi
+            }
+
+            if [ "$REPEAT" -gt 1 ]; then
+                for i in $(seq 1 "$REPEAT"); do
+                    run_control_command
+                    if [ $? -ne 0 ]; then
+                        echo "ERROR: Control command failed at step $STEP"
+                        FAILED=true
+                        break 2
+                    fi
+                    sleep 0.3
+                done
+            else
+                run_control_command
+                if [ $? -ne 0 ]; then
+                    echo "ERROR: Control command failed at step $STEP"
+                    FAILED=true
+                    break
+                fi
+            fi
+            ;;
+        agent)
+            AGENT_ACTION=$(jq -r --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step].action' "$ROUTINES_FILE")
+            AGENT_ACTION=$(substitute_vars "$AGENT_ACTION")
+            bash ~/phone_agent.sh "$AGENT_ACTION"
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Agent command failed at step $STEP"
+                FAILED=true
+                break
+            fi
+            ;;
+        delay)
+            DELAY=$(jq -r --arg name "$ROUTINE_NAME" --argjson step "$STEP" '.routines[$name].commands[$step].value' "$ROUTINES_FILE")
+            echo "  Waiting ${DELAY}s..."
+            sleep "$DELAY"
+            ;;
+    esac
+
+    STEP=$((STEP + 1))
+    sleep 0.5
+done
+
+echo ""
+if [ "$FAILED" = true ]; then
+    echo "Routine '$ROUTINE_NAME' FAILED at step $STEP."
+    exit 1
+else
+    echo "Routine '$ROUTINE_NAME' complete."
+    exit 0
+fi
+EOF
+chmod +x ~/routine_runner.sh
+echo "✅ routine_runner.sh created and made executable!"
