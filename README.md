@@ -56,13 +56,13 @@ The OpenClaw platform gives developers the raw power to bridge code and the real
 
 ## 💡 Solution
 
-**WeaveClaw is the intelligence layer that automates the _creation_ of any use case.**
+**WeaveClaw is the intelligence layer that automates the _creation_ of ANY use case.**
 
 Instead of building one highly specific automation, we built an engine that lets _any user_ — technical or not — describe what they want in plain language (via Telegram, or any chat app), and have the system:
 
 1. **Parse intent** using a locally-running **Qwen3-Coder-30B LLM** (quantized, fully on-device).
 2. **Translate** that intent into structured command chains — routines, deep links, shell commands, visual agent actions.
-3. **Execute** those commands directly on the Samsung Galaxy device in real-time via **Termux + Shizuku**, controlling apps, system settings, smart home devices, and even physically navigating UIs.
+3. **Execute** those commands directly on the Samsung Galaxy device in real-time via **Termux**, controlling apps, system settings, smart home devices, and even physically navigating UIs.
 4. **Learn & suggest** — a heartbeat-driven pattern scanner detects repeated behaviors and suggests new automations automatically.
 
 **Zero cloud. Zero coding. Zero companion apps.**
@@ -71,10 +71,12 @@ Instead of building one highly specific automation, we built an engine that lets
 
 ## ✨ Key Features
 
+> 🚀 **The use cases below are just the beginning.** WeaveClaw is a universal automation backbone — what it can do is only limited by your imagination. These demos were built to showcase the range of what's possible, but the real power lies in *your* creativity. Any workflow, any app, any intent — if you can describe it, WeaveClaw can do it.
+
+---
+
 ### 1. 🔄 Routine Automation Engine
-
 Define keyword-triggered routines entirely through chat. Say _"Lock In"_ and WeaveClaw instantly:
-
 - Enables DND
 - Launches LoFi music on YouTube Music
 - Sets smart lights to Cyan
@@ -83,9 +85,7 @@ Define keyword-triggered routines entirely through chat. Say _"Lock In"_ and Wea
 Routines are stored in `routines.json` and can be created, edited, and deleted conversationally — the bot dynamically rewrites the JSON on the fly.
 
 ### 2. 🛡️ Safe Journey (Personal Safety)
-
 A critical tool for the safety of women and the elderly:
-
 - User types their destination and ETA
 - System sends SMS + live location to all emergency contacts via Telegram
 - Auto-sets a `Y+10 minute` check-in timer
@@ -93,9 +93,7 @@ A critical tool for the safety of women and the elderly:
 - If confirmed → contacts get a safe-arrival notification
 
 ### 3. 🗺️ Trip Planner (Complex Multi-App Flows)
-
 WeaveClaw bridges separate apps into a single cohesive workflow:
-
 - Proactively reads calendar for events
 - Web-searches weather at the destination
 - Finds top-rated restaurants & activities
@@ -103,26 +101,20 @@ WeaveClaw bridges separate apps into a single cohesive workflow:
 - All through the **Visual Agent** when deep links aren't enough
 
 ### 4. 👁️ Visual Agent (Qwen-Powered Screen Automation)
-
 When intents or deep links can't reach a target, the Visual Agent takes over:
-
 - Captures the screen's UI hierarchy via `uiautomator`
 - Reads bounding-box coordinates of every element
 - The LLM outputs precise tap/swipe/type JSON actions
 - Operates autonomously for up to 15 steps per task
 
 ### 5. 🔔 GitHub Repository Watcher
-
 Background polling for pushes, issues, PRs, and releases on any GitHub repo:
-
 - Supports private repos with token auth
 - Sends real-time Telegram notifications
 - Physical smart light feedback (red = new push detected, blink = auto-fix running, green = done)
 
 ### 6. 🔒 100% On-Device Privacy
-
 While Alexa, Google Home, and Microsoft Copilot send every word to the cloud, WeaveClaw stays silent:
-
 - **Qwen3-Coder-30B** runs locally via Ollama
 - Shell execution happens on-device
 - No external API calls for processing
@@ -189,7 +181,7 @@ While Alexa, Google Home, and Microsoft Copilot send every word to the cloud, We
 | **On-Device LLM**   | Qwen3-Coder-30B (quantized), served via Ollama                |
 | **Backend**         | Node.js, Express 5, SQLite (better-sqlite3), WebSocket (ws)   |
 | **Mobile App**      | Flutter (Dart), Material 3                                    |
-| **Shell Execution** | Bash scripts on Termux + Shizuku (ADB-level privileges)       |
+| **Shell Execution** | Bash scripts on Termux      |
 | **Smart Home**      | MR Star LED controller, Wipro RGBCCT bulb (via UI automation) |
 | **Messaging**       | Telegram Bot API, deep links (`tg://resolve`)                 |
 | **Background Jobs** | node-cron (heartbeat), custom watcher runner (GitHub polling) |
@@ -270,7 +262,6 @@ WeaveClaw/
 | ------------------------ | ----------------------------------------------------------------------------------- |
 | **Samsung Galaxy phone** | (or any Android device with Termux support)                                         |
 | **Termux**               | Terminal emulator for Android — [F-Droid](https://f-droid.org/packages/com.termux/) |
-| **Shizuku**              | ADB-over-WiFi privilege delegation — [GitHub](https://github.com/RikkaApps/Shizuku) |
 | **Ollama**               | Local LLM server (for Qwen3-Coder-30B)                                              |
 | **Node.js**              | v18+ (for backend)                                                                  |
 | **Flutter**              | 3.11+ (for mobile app)                                                              |
@@ -361,13 +352,6 @@ ollama pull qwen3-coder:30b
 
 # Ollama serves on http://localhost:11434 by default
 ```
-
-### 6. Shizuku Activation
-
-1. Install Shizuku from the Play Store or GitHub
-2. Enable **Wireless Debugging** in Developer Options
-3. Pair and start Shizuku
-4. Grant Termux the Shizuku permission
 
 ---
 
