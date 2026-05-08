@@ -8,7 +8,7 @@
 <h1 align="center">🕸️ WeaveClaw</h1>
 <p align="center"><b>Ditch the coding scenes. Just automate your routines.</b></p>
 <p align="center">
-  A conversational AI automation engine built on top of the <a href="https://github.com/nicepkg/openclaw">OpenClaw</a> ecosystem that turns <i>natural language</i> into powerful, privacy-first on-device automations — no coding, no companion apps, no cloud.
+  A conversational AI automation engine built on top of the <a href="https://openclaw.ai/">OpenClaw</a> ecosystem that turns <i>natural language</i> into powerful, privacy-first on-device automations — no coding, no companion apps, no cloud.
 </p>
 
 ---
