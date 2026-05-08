@@ -127,7 +127,7 @@ While Alexa, Google Home, and Microsoft Copilot send every word to the cloud, We
 ## 🏗️ Architecture
 
 <p align="center">
-  <img src="assets/architecture-diagram.png" alt="WeaveClaw Architecture Diagram" width="780" />
+  <img src="assets/architecture-diagram.png" alt="WeaveClaw Architecture Diagram" width="1000" />
 </p>
 
 ---
