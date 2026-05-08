@@ -2,7 +2,6 @@ cat > ~/phone_agent.sh << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
 # ─────────────────────────────────────────
-# Standard OpenAI-Compatible API Configuration
 # (Works with Ollama, LM Studio, Together AI, vLLM, etc.)
 API_ENDPOINT="http://localhost:11434/v1" # E.g., Use "https://api.together.xyz/v1" for cloud
 API_KEY="sk-your-api-key"                # Leave as whatever for local Ollama
