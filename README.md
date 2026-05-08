@@ -15,11 +15,11 @@
 
 ## Evaluation Resources
 
-- **Project Demo Video:** A concise walkthrough (7 minutes) demonstrating the problem, core features, and an end-to-end usage scenario. Link: [Demo Video](#).
+- **Project Demo Video:** A concise walkthrough (7 minutes) demonstrating the problem, core features, and an end-to-end usage scenario. Link: [Demo Video](#)
 
 - **AI Disclosure:** A brief statement describing which AI models and tools were used, how they were applied, and any data or privacy considerations (e.g., on-device vs. cloud processing). Link: [AI Disclosure](https://docs.google.com/document/d/1i6jxCZyWI92Y--x9PeE7rigNWJlKA1dhdSSAykXcb1A/edit?tab=t.0).
 
-- **Project Presentation (PPT):** Slide deck (PPTX) summarizing the problem, solution, architecture, demo highlights, and usage / deployment notes. Link: [Project Presentation (PPT)](https://canva.link/o31ar7ky0h0vwbz).
+- **Project Presentation (PPT):** Slide deck (PPTX) summarizing the problem, solution, architecture, demo highlights, and usage / deployment notes. Link: [Project Presentation (PPT)](https://canva.link/o31ar7ky0h0vwbz)
 
 <!-- ═══════════════════════════════════════════════════════ -->
 
@@ -126,53 +126,9 @@ While Alexa, Google Home, and Microsoft Copilot send every word to the cloud, We
 
 ## 🏗️ Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        USER                                  │
-│              (Telegram / Any Chat App)                       │
-└──────────────────┬───────────────────────────────────────────┘
-                   │ Natural Language Message
-                   ▼
-┌──────────────────────────────────────────────────────────────┐
-│                  WeaveClaw Backend (Node.js)                 │
-│  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐  │
-│  │Rule Classifier│→│ Skill Builder │→│ Skill Executor    │  │
-│  │(NLP / Intent) │  │(Action Plan)  │  │(Command Dispatch)│  │
-│  └──────────────┘  └───────────────┘  └────────┬─────────┘  │
-│  ┌──────────────┐  ┌───────────────┐           │            │
-│  │Clarification │  │ Heartbeat /   │           │            │
-│  │Handler       │  │ Pattern Scan  │           │            │
-│  └──────────────┘  └───────────────┘           │            │
-│  ┌──────────────┐  ┌───────────────┐           │            │
-│  │Watcher Runner│  │ Notifications │           │            │
-│  │(GitHub Poll) │  │ (WebSocket)   │           │            │
-│  └──────────────┘  └───────────────┘           │            │
-└────────────────────────────────────────────────┼────────────┘
-                                                 │
-              ┌──────────────────────────────────┤
-              ▼                                  ▼
-┌─────────────────────────┐    ┌──────────────────────────────┐
-│   OpenClaw / ADB Layer  │    │   Qwen3-Coder-30B (Ollama)   │
-│  ┌────────────────────┐ │    │   Local LLM for:             │
-│  │ phone_control.sh   │ │    │   - Intent parsing           │
-│  │ phone_agent.sh     │ │    │   - Visual agent reasoning   │
-│  │ routine_runner.sh  │ │    │   - Routine generation       │
-│  └────────┬───────────┘ │    └──────────────────────────────┘
-│           │             │
-│  ┌────────▼───────────┐ │
-│  │ Termux + Shizuku   │ │
-│  │ (ADB Shell Access) │ │
-│  └────────┬───────────┘ │
-└───────────┼─────────────┘
-            ▼
-┌─────────────────────────┐
-│   Samsung Galaxy Device │
-│  • Apps  • System       │
-│  • Smart Lights (IoT)   │
-│  • Calendar / Notes     │
-│  • Telegram             │
-└─────────────────────────┘
-```
+<p align="center">
+  <img src="assets/architecture-diagram.png" alt="WeaveClaw Architecture Diagram" width="780" />
+</p>
 
 ---
 
