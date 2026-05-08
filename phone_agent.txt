@@ -5,7 +5,7 @@ cat > ~/phone_agent.sh << 'EOF'
 # (Works with Ollama, LM Studio, Together AI, vLLM, etc.)
 API_ENDPOINT="http://localhost:11434/v1" # E.g., Use "https://api.together.xyz/v1" for cloud
 API_KEY="sk-your-api-key"                # Leave as whatever for local Ollama
-MODEL="qwen2.5-coder:32b"                # Adjust to your exact model name
+MODEL="qwen3-coder:30b"                # Adjust to your exact model name
 # ─────────────────────────────────────────
 
 MAX_STEPS=15
