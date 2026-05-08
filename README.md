@@ -31,11 +31,9 @@
 - [Architecture](#-architecture)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
-- [Setup & Installation](#-setup--installation)
+- [Setup & Installation](#️-setup--installation)
 - [Usage](#-usage)
 - [Samsung Ecosystem Fit](#-samsung-ecosystem-fit)
-- [Team](#-team)
-- [License](#-license)
 
 ---
 
