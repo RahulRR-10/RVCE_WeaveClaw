@@ -15,11 +15,11 @@
 
 ## Evaluation Resources
 
-- **Project Demo Video:** A concise walkthrough (7 minutes) demonstrating the problem, core features, and an end-to-end usage scenario. Link: [Demo Video](#)
+- **Project Demo Video:** A concise walkthrough (7 minutes) demonstrating the problem, core features, and an end-to-end usage scenario. Link: [Demo Video](#).
 
 - **AI Disclosure:** A brief statement describing which AI models and tools were used, how they were applied, and any data or privacy considerations (e.g., on-device vs. cloud processing). Link: [AI Disclosure](https://docs.google.com/document/d/1i6jxCZyWI92Y--x9PeE7rigNWJlKA1dhdSSAykXcb1A/edit?tab=t.0).
 
-- **Project Presentation (PPT):** Slide deck (PPTX) summarizing the problem, solution, architecture, demo highlights, and usage / deployment notes. Link: [Project Presentation (PPT)](https://canva.link/o31ar7ky0h0vwbz)
+- **Project Presentation (PPT):** Slide deck (PPTX) summarizing the problem, solution, architecture, demo highlights, and usage / deployment notes. Link: [Project Presentation (PPT)](https://canva.link/o31ar7ky0h0vwbz).
 
 <!-- ═══════════════════════════════════════════════════════ -->
 
@@ -71,7 +71,9 @@ Instead of building one highly specific automation, we built an engine that lets
 
 ## ✨ Key Features
 
-> 🚀 **The use cases below are just the beginning.** WeaveClaw is a universal automation backbone — what it can do is only limited by your imagination. These demos were built to showcase the range of what's possible, but the real power lies in *your* creativity. Any workflow, any app, any intent — if you can describe it, WeaveClaw can do it.
+<p align="center">
+  <img src="assets/features-canvas.png" alt="WeaveClaw is an open automation canvas — the only limit is your creativity" width="680" />
+</p>
 
 ---
 
@@ -244,6 +246,8 @@ WeaveClaw/
 │   ├── github_repo_notify_telegram.sh  # Telegram alert hook
 │   └── github_repo_watcher.md      # Documentation
 │
+├── assets/
+│   └── features-canvas.png         # Key Features banner image
 ├── phone_control.txt               # 970+ line device control script (phone_control.sh)
 ├── phone_agent.txt                 # Visual agent script (phone_agent.sh)
 ├── routine_runner.txt              # Routine execution engine (routine_runner.sh)
