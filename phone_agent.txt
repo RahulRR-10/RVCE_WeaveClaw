@@ -23,7 +23,7 @@ elif su -c 'echo ok' 2>/dev/null | grep -q ok; then
   PRIV_CMD="su -c"
 else
   PRIV="none"
-  echo "⚠️ No root/Shizuku. Agent requires screen control privileges."
+  echo "Agent requires screen control privileges."
   exit 1
 fi
 
