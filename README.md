@@ -15,13 +15,11 @@
 
 ## Evaluation Resources
 
-Please provide the following deliverables for evaluation. Each item is required.
+- **Project Demo Video:** A concise walkthrough (7 minutes) demonstrating the problem, core features, and an end-to-end usage scenario. Link: [Demo Video](#) — replace with your video URL.
 
-- **Project Demo Video:** A concise walkthrough (3–8 minutes) demonstrating the problem, core features, and an end-to-end usage scenario. Link: [Demo Video](#) — replace with your video URL.
+- **AI Disclosure:** A brief statement describing which AI models and tools were used, how they were applied, and any data or privacy considerations (e.g., on-device vs. cloud processing). Link or embed: [AI Disclosure](https://docs.google.com/document/d/1i6jxCZyWI92Y--x9PeE7rigNWJlKA1dhdSSAykXcb1A/edit?tab=t.0).
 
-- **AI Disclosure:** A brief statement describing which AI models and tools were used, how they were applied, and any data or privacy considerations (e.g., on-device vs. cloud processing). Link or embed: [AI Disclosure](#).
-
-- **Project Presentation (PPT):** Slide deck (PPTX or PDF) summarizing the problem, solution, architecture, demo highlights, and usage / deployment notes. Link: [Project Presentation (PPT)](#) — attach PPTX or PDF.
+- **Project Presentation (PPT):** Slide deck (PPTX) summarizing the problem, solution, architecture, demo highlights, and usage / deployment notes. Link: [Project Presentation (PPT)](https://canva.link/o31ar7ky0h0vwbz)
 
 <!-- ═══════════════════════════════════════════════════════ -->
 
