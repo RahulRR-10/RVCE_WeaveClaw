@@ -13,9 +13,15 @@
 
 ---
 
-## 📺 Demo Video
+## Evaluation Resources
 
-> **🎬 Watch the full demo here →** `[LINK TO DEMO VIDEO]`
+Please provide the following deliverables for evaluation. Each item is required.
+
+- **Project Demo Video:** A concise walkthrough (3–8 minutes) demonstrating the problem, core features, and an end-to-end usage scenario. Link: [Demo Video](#) — replace with your video URL.
+
+- **AI Disclosure:** A brief statement describing which AI models and tools were used, how they were applied, and any data or privacy considerations (e.g., on-device vs. cloud processing). Link or embed: [AI Disclosure](#).
+
+- **Project Presentation (PPT):** Slide deck (PPTX or PDF) summarizing the problem, solution, architecture, demo highlights, and usage / deployment notes. Link: [Project Presentation (PPT)](#) — attach PPTX or PDF.
 
 <!-- ═══════════════════════════════════════════════════════ -->
 
@@ -39,12 +45,12 @@
 
 The OpenClaw platform gives developers the raw power to bridge code and the real world — from controlling smart lights on a GitHub push to launching complex multi-app workflows. **But there's a catch:**
 
-| Barrier | Impact |
-|---|---|
-| **Requires YAML, bash, and Android intents** | 95 %+ of users can't build automations |
-| **No conversational interface** | Every routine must be hand-coded end-to-end |
+| Barrier                                                        | Impact                                              |
+| -------------------------------------------------------------- | --------------------------------------------------- |
+| **Requires YAML, bash, and Android intents**                   | 95 %+ of users can't build automations              |
+| **No conversational interface**                                | Every routine must be hand-coded end-to-end         |
 | **Cloud-dependent alternatives** (Alexa, Google Home, Copilot) | Every voice command & data packet leaves the device |
-| **Bixby's rigid menu-driven setup** | Frustrating UX, limited composability |
+| **Bixby's rigid menu-driven setup**                            | Frustrating UX, limited composability               |
 
 > _The use case is there. The tool is there. But the bridge between the two is broken._
 
@@ -68,7 +74,9 @@ Instead of building one highly specific automation, we built an engine that lets
 ## ✨ Key Features
 
 ### 1. 🔄 Routine Automation Engine
+
 Define keyword-triggered routines entirely through chat. Say _"Lock In"_ and WeaveClaw instantly:
+
 - Enables DND
 - Launches LoFi music on YouTube Music
 - Sets smart lights to Cyan
@@ -77,7 +85,9 @@ Define keyword-triggered routines entirely through chat. Say _"Lock In"_ and Wea
 Routines are stored in `routines.json` and can be created, edited, and deleted conversationally — the bot dynamically rewrites the JSON on the fly.
 
 ### 2. 🛡️ Safe Journey (Personal Safety)
+
 A critical tool for the safety of women and the elderly:
+
 - User types their destination and ETA
 - System sends SMS + live location to all emergency contacts via Telegram
 - Auto-sets a `Y+10 minute` check-in timer
@@ -85,7 +95,9 @@ A critical tool for the safety of women and the elderly:
 - If confirmed → contacts get a safe-arrival notification
 
 ### 3. 🗺️ Trip Planner (Complex Multi-App Flows)
+
 WeaveClaw bridges separate apps into a single cohesive workflow:
+
 - Proactively reads calendar for events
 - Web-searches weather at the destination
 - Finds top-rated restaurants & activities
@@ -93,20 +105,26 @@ WeaveClaw bridges separate apps into a single cohesive workflow:
 - All through the **Visual Agent** when deep links aren't enough
 
 ### 4. 👁️ Visual Agent (Qwen-Powered Screen Automation)
+
 When intents or deep links can't reach a target, the Visual Agent takes over:
+
 - Captures the screen's UI hierarchy via `uiautomator`
 - Reads bounding-box coordinates of every element
 - The LLM outputs precise tap/swipe/type JSON actions
 - Operates autonomously for up to 15 steps per task
 
 ### 5. 🔔 GitHub Repository Watcher
+
 Background polling for pushes, issues, PRs, and releases on any GitHub repo:
+
 - Supports private repos with token auth
 - Sends real-time Telegram notifications
 - Physical smart light feedback (red = new push detected, blink = auto-fix running, green = done)
 
 ### 6. 🔒 100% On-Device Privacy
+
 While Alexa, Google Home, and Microsoft Copilot send every word to the cloud, WeaveClaw stays silent:
+
 - **Qwen3-Coder-30B** runs locally via Ollama
 - Shell execution happens on-device
 - No external API calls for processing
@@ -168,17 +186,17 @@ While Alexa, Google Home, and Microsoft Copilot send every word to the cloud, We
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **On-Device LLM** | Qwen3-Coder-30B (quantized), served via Ollama |
-| **Backend** | Node.js, Express 5, SQLite (better-sqlite3), WebSocket (ws) |
-| **Mobile App** | Flutter (Dart), Material 3 |
-| **Shell Execution** | Bash scripts on Termux + Shizuku (ADB-level privileges) |
-| **Smart Home** | MR Star LED controller, Wipro RGBCCT bulb (via UI automation) |
-| **Messaging** | Telegram Bot API, deep links (`tg://resolve`) |
+| Layer               | Technology                                                    |
+| ------------------- | ------------------------------------------------------------- |
+| **On-Device LLM**   | Qwen3-Coder-30B (quantized), served via Ollama                |
+| **Backend**         | Node.js, Express 5, SQLite (better-sqlite3), WebSocket (ws)   |
+| **Mobile App**      | Flutter (Dart), Material 3                                    |
+| **Shell Execution** | Bash scripts on Termux + Shizuku (ADB-level privileges)       |
+| **Smart Home**      | MR Star LED controller, Wipro RGBCCT bulb (via UI automation) |
+| **Messaging**       | Telegram Bot API, deep links (`tg://resolve`)                 |
 | **Background Jobs** | node-cron (heartbeat), custom watcher runner (GitHub polling) |
-| **Validation** | Zod schemas, Jest + Supertest (7 test suites) |
-| **Version Control** | Git, GitHub |
+| **Validation**      | Zod schemas, Jest + Supertest (7 test suites)                 |
+| **Version Control** | Git, GitHub                                                   |
 
 ---
 
@@ -250,16 +268,16 @@ WeaveClaw/
 
 ### Prerequisites
 
-| Requirement | Details |
-|---|---|
-| **Samsung Galaxy phone** | (or any Android device with Termux support) |
-| **Termux** | Terminal emulator for Android — [F-Droid](https://f-droid.org/packages/com.termux/) |
-| **Shizuku** | ADB-over-WiFi privilege delegation — [GitHub](https://github.com/RikkaApps/Shizuku) |
-| **Ollama** | Local LLM server (for Qwen3-Coder-30B) |
-| **Node.js** | v18+ (for backend) |
-| **Flutter** | 3.11+ (for mobile app) |
-| **jq** | JSON processor (`pkg install jq` in Termux) |
-| **curl** | HTTP client (`pkg install curl` in Termux) |
+| Requirement              | Details                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| **Samsung Galaxy phone** | (or any Android device with Termux support)                                         |
+| **Termux**               | Terminal emulator for Android — [F-Droid](https://f-droid.org/packages/com.termux/) |
+| **Shizuku**              | ADB-over-WiFi privilege delegation — [GitHub](https://github.com/RikkaApps/Shizuku) |
+| **Ollama**               | Local LLM server (for Qwen3-Coder-30B)                                              |
+| **Node.js**              | v18+ (for backend)                                                                  |
+| **Flutter**              | 3.11+ (for mobile app)                                                              |
+| **jq**                   | JSON processor (`pkg install jq` in Termux)                                         |
+| **curl**                 | HTTP client (`pkg install curl` in Termux)                                          |
 
 ### 1. Clone the Repository
 
@@ -290,16 +308,16 @@ The backend will start on `http://localhost:3000`.
 
 #### Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `PORT` | No | Server port (default: `3000`) |
-| `DB_PATH` | No | SQLite database path (default: `./WeaveClaw.db`) |
-| `SIMULATION_MODE` | No | `true` to simulate device commands |
-| `OPENCLAW_GATEWAY_URL` | Yes | OpenClaw gateway (default: `http://localhost:18789`) |
-| `OPENCLAW_AUTH_TOKEN` | Yes | Auth token after OpenClaw onboarding |
-| `SMARTTHINGS_TOKEN` | No | Samsung SmartThings API token |
-| `HEARTBEAT_INTERVAL_MINUTES` | No | Pattern scan frequency (default: `15`) |
-| `SUGGESTION_CONFIDENCE_THRESHOLD` | No | Min confidence for suggestions (default: `0.70`) |
+| Variable                          | Required | Description                                          |
+| --------------------------------- | -------- | ---------------------------------------------------- |
+| `PORT`                            | No       | Server port (default: `3000`)                        |
+| `DB_PATH`                         | No       | SQLite database path (default: `./WeaveClaw.db`)     |
+| `SIMULATION_MODE`                 | No       | `true` to simulate device commands                   |
+| `OPENCLAW_GATEWAY_URL`            | Yes      | OpenClaw gateway (default: `http://localhost:18789`) |
+| `OPENCLAW_AUTH_TOKEN`             | Yes      | Auth token after OpenClaw onboarding                 |
+| `SMARTTHINGS_TOKEN`               | No       | Samsung SmartThings API token                        |
+| `HEARTBEAT_INTERVAL_MINUTES`      | No       | Pattern scan frequency (default: `15`)               |
+| `SUGGESTION_CONFIDENCE_THRESHOLD` | No       | Min confidence for suggestions (default: `0.70`)     |
 
 ### 3. Flutter App Setup
 
@@ -374,18 +392,18 @@ User: "Plan a trip to Church Street this Saturday"
 
 ### API Endpoints
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/chat` | POST | Conversational AI — intent classification, skill creation, execution |
-| `/skills` | GET | List all skills |
-| `/skills/:id/execute` | POST | Execute a specific skill |
-| `/devices` | GET | List registered devices |
-| `/watchers` | GET/POST/DELETE | Manage background watchers |
-| `/suggestions` | GET | View AI-generated suggestions |
-| `/conflicts` | GET | Detect skill conflicts |
-| `/heartbeat/scan` | POST | Trigger a pattern scan |
-| `/health` | GET | Health check |
-| `/ws` | WebSocket | Real-time notifications |
+| Endpoint              | Method          | Description                                                          |
+| --------------------- | --------------- | -------------------------------------------------------------------- |
+| `/chat`               | POST            | Conversational AI — intent classification, skill creation, execution |
+| `/skills`             | GET             | List all skills                                                      |
+| `/skills/:id/execute` | POST            | Execute a specific skill                                             |
+| `/devices`            | GET             | List registered devices                                              |
+| `/watchers`           | GET/POST/DELETE | Manage background watchers                                           |
+| `/suggestions`        | GET             | View AI-generated suggestions                                        |
+| `/conflicts`          | GET             | Detect skill conflicts                                               |
+| `/heartbeat/scan`     | POST            | Trigger a pattern scan                                               |
+| `/health`             | GET             | Health check                                                         |
+| `/ws`                 | WebSocket       | Real-time notifications                                              |
 
 ### Running Routines Directly
 
@@ -443,15 +461,16 @@ bash ~/phone_agent.sh "Open YouTube and search for productivity music"
 
 WeaveClaw is purpose-built for the Samsung ecosystem:
 
-| Samsung Platform | WeaveClaw Integration |
-|---|---|
-| **Bixby** | Replaces rigid menu-driven setup with fluid, conversational AI |
-| **Knox** | Data never leaves the device — fully local LLM processing |
-| **SmartThings** | Native command translation for home automation |
-| **Samsung DeX** | Plug in, type a message, and have your workspace auto-configure |
-| **Galaxy AI** | Extends on-device AI with autonomous multi-step workflows |
+| Samsung Platform | WeaveClaw Integration                                           |
+| ---------------- | --------------------------------------------------------------- |
+| **Bixby**        | Replaces rigid menu-driven setup with fluid, conversational AI  |
+| **Knox**         | Data never leaves the device — fully local LLM processing       |
+| **SmartThings**  | Native command translation for home automation                  |
+| **Samsung DeX**  | Plug in, type a message, and have your workspace auto-configure |
+| **Galaxy AI**    | Extends on-device AI with autonomous multi-step workflows       |
 
 ---
+
 <p align="center">
   <i>"Without AI, your phone is just a dabba."</i><br/>
   <b>WeaveClaw — Ditch the coding scenes. Just automate your routines.</b>
